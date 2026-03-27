@@ -1,4 +1,4 @@
-package com.scaler.concept.structural_patterns;
+package scaler.concept.structural_patterns.java;
 
 import java.util.HashMap;
 import java.util.Map;

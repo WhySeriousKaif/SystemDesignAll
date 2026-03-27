@@ -1,4 +1,4 @@
-package com.scaler.concept.structural_patterns;
+package scaler.concept.structural_patterns.java;
 
 // 4. Adapter Pattern
 // Purpose: Bridge incompatible interfaces.

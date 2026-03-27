@@ -204,7 +204,36 @@ public class SensorService {
 
 ---
 
-## 🔥 5. Interview Grilling Points (SDE-2/3 Insights)
+## 🔄 5. State Design Pattern - Deep Dive (Instructor's Masterclass)
+
+The instructor specifically highlighted the **State Pattern** as the backbone of the elevator's behavior logic.
+
+### 🎯 5.1 Why State Pattern? (The "If-Else" Problem)
+Without this pattern, the elevator's movement logic becomes a nightmare of conditional checks:
+```java
+// ❌ BAD: The "If-Else Hell"
+if (state == MOVING_UP) { ... }
+else if (state == MOVING_DOWN) { ... }
+else if (state == IDLE) { ... }
+```
+This approach is brittle and hard to maintain. The State Pattern **encapsulates** these behaviors into separate classes.
+
+### ⚖️ 5.2 State vs. Subclassing
+**Critical Interview Point**: "States are **not** subclasses of Elevator. It's the **same elevator object** that transitions between different states over its lifetime. Subclassing would create multiple stagnant objects, which is architecturally incorrect for this use case."
+
+### 🛠️ 5.3 Technical Implementation
+1.  **Interface**: Create a `State` interface (e.g., `performAction()`).
+2.  **Concrete Classes**: `MovingUpState`, `MovingDownState`, `IdleState`, `MaintenanceState`.
+3.  **Context**: The `Elevator` contains a reference to the current `State` object.
+4.  **Delegation**: The elevator delegates work: `state.performAction(this)`.
+
+### 🚀 5.4 Benefits: Transitions & Extensibility
+- **Self-Managed Transitions**: A state can trigger the next state (e.g., `MovingUp` transitions to `Idle` once the destination is reached).
+- **Easy Extensibility**: Adding an `EmergencyState` or `FireAlarmState` requires adding a new class, not modifying 50 lines of `if-else` in the core Elevator class.
+
+---
+
+## 🔥 6. Interview Grilling Points (SDE-2/3 Insights)
 
 These are the critical deep-dive topics often discussed after presenting the initial design.
 
@@ -254,13 +283,44 @@ import java.util.concurrent.*;
 // 1. Enums & Interfaces
 enum Direction { UP, DOWN, IDLE }
 enum StateType { IDLE, MOVING_UP, MOVING_DOWN }
+
 interface ElevatorObserver { void update(int floor, StateType state); }
+
+// 2. State Pattern Implementation (Instructor Recommended)
+interface State {
+    void handle(Elevator e, int targetFloor);
+    StateType getType();
+}
+
+class IdleState implements State {
+    public void handle(Elevator e, int target) {
+        if (target == -1) return;
+        if (target > e.getCurrentFloor()) e.setState(new MovingUpState());
+        else if (target < e.getCurrentFloor()) e.setState(new MovingDownState());
+    }
+    public StateType getType() { return StateType.IDLE; }
+}
+
+class MovingUpState implements State {
+    public void handle(Elevator e, int target) {
+        if (e.getCurrentFloor() < target) e.moveOneFloor(1);
+        else e.setState(new IdleState());
+    }
+    public StateType getType() { return StateType.MOVING_UP; }
+}
+
+class MovingDownState implements State {
+    public void handle(Elevator e, int target) {
+        if (e.getCurrentFloor() > target) e.moveOneFloor(-1);
+        else e.setState(new IdleState());
+    }
+    public StateType getType() { return StateType.MOVING_DOWN; }
+}
 
 interface TaskSchedulingStrategy {
     int getNextFloor(int current, Queue<Integer> queue);
 }
 
-// 2. Concrete Strategy
 class FIFOSchedulingStrategy implements TaskSchedulingStrategy {
     public int getNextFloor(int current, Queue<Integer> queue) {
         return queue.isEmpty() ? -1 : queue.peek();
@@ -271,7 +331,7 @@ class FIFOSchedulingStrategy implements TaskSchedulingStrategy {
 class Elevator implements Runnable {
     private final int id;
     private int currentFloor = 1;
-    private StateType state = StateType.IDLE;
+    private State state = new IdleState();
     private final Queue<Integer> floorQueue = new ConcurrentLinkedQueue<>();
     private final List<ElevatorObserver> observers = new CopyOnWriteArrayList<>();
     private final TaskSchedulingStrategy scheduler = new FIFOSchedulingStrategy();
@@ -280,32 +340,27 @@ class Elevator implements Runnable {
     
     public void addObserver(ElevatorObserver o) { observers.add(o); }
     public void addToQueue(int floor) { floorQueue.add(floor); }
+    public void setState(State s) { this.state = s; notifyObservers(); }
+    public int getCurrentFloor() { return currentFloor; }
 
     public void run() {
         while (true) {
             int target = scheduler.getNextFloor(currentFloor, floorQueue);
-            if (target != -1) {
-                simulateMovement(target);
+            state.handle(this, target);
+            if (state.getType() == StateType.IDLE && target != -1) {
+                floorQueue.remove(target);
             }
-            try { Thread.sleep(100); } catch (Exception ignored) {}
+            try { Thread.sleep(500); } catch (Exception ignored) {}
         }
     }
 
-    private void simulateMovement(int target) {
-        state = (target > currentFloor) ? StateType.MOVING_UP : StateType.MOVING_DOWN;
-        notifyObservers();
-        while (currentFloor != target) {
-            try { Thread.sleep(500); } catch (Exception ignored) {}
-            currentFloor += (target > currentFloor) ? 1 : -1;
-            notifyObservers();
-        }
-        floorQueue.remove(target);
-        state = StateType.IDLE;
+    public void moveOneFloor(int delta) {
+        currentFloor += delta;
         notifyObservers();
     }
 
     private void notifyObservers() {
-        for (ElevatorObserver o : observers) o.update(currentFloor, state);
+        for (ElevatorObserver o : observers) o.update(currentFloor, state.getType());
     }
 }
 
@@ -315,37 +370,24 @@ class ElevatorManager {
     public void addElevator(Elevator e) { elevators.add(e); }
 
     public void requestElevator(int floor) {
-        System.out.println("\n[Manager] Floor " + floor + " request assigned to nearest car.");
-        // Simple assignment to first car for demo
+        System.out.println("\n[Manager] F" + floor + " request assigned to nearest car.");
         if (!elevators.isEmpty()) elevators.get(0).addToQueue(floor);
     }
 }
 
-// 5. Observer (Panel)
-class OuterPanel implements ElevatorObserver {
-    private final int floorLocation;
-    public OuterPanel(int f) { this.floorLocation = f; }
-
-    public void update(int floor, StateType state) {
-        System.out.println("  > [Floor " + floorLocation + " Panel] Car at F" + floor + " (" + state + ")");
-    }
-}
-
-// 6. Driver
+// 5. Driver
 public class Main {
     public static void main(String[] args) throws InterruptedException {
         ElevatorManager manager = new ElevatorManager();
         Elevator car = new Elevator(1);
         manager.addElevator(car);
         
-        OuterPanel f3Panel = new OuterPanel(3);
-        car.addObserver(f3Panel); // Observer subscribes to CAR
+        car.addObserver((f, s) -> System.out.println("  > [System Display] Car at F" + f + " [" + s + "]"));
         
         new Thread(car).start();
         
         System.out.println("--- Starting Simulation ---");
         manager.requestElevator(3);
-        
         Thread.sleep(3000);
         manager.requestElevator(1);
     }

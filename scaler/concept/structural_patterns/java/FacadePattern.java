@@ -1,4 +1,4 @@
-package com.scaler.concept.structural_patterns;
+package scaler.concept.structural_patterns.java;
 
 // 6. Facade Pattern
 // Purpose: Hide system complexity from client by providing a simplified interface.

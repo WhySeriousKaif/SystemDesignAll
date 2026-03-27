@@ -1,4 +1,4 @@
-package com.scaler.concept.structural_patterns;
+package scaler.concept.structural_patterns.java;
 
 // 5. Bridge Pattern
 // Purpose: Decouple abstraction from implementation so both vary independently.

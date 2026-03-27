@@ -1,4 +1,4 @@
-package com.scaler.concept.structural_patterns;
+package scaler.concept.structural_patterns.java;
 
 // 1. Decorator Pattern
 // Purpose: Add functionality to existing objects without changing their structure.

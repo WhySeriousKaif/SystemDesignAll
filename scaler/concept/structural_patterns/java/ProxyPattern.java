@@ -1,4 +1,4 @@
-package com.scaler.concept.structural_patterns;
+package scaler.concept.structural_patterns.java;
 
 // 2. Proxy Pattern
 // Purpose: Control access to original object (validation, logging, access control).
