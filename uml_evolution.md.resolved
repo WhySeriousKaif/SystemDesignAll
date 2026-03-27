@@ -1,0 +1,163 @@
+# Object-Oriented Design Evolution Diagrams
+
+This document tracks the evolution of two systems through progressive versions, illustrating key design principles.
+
+---
+
+## Class 1: Bird System Evolution
+
+### v0: Monolithic Design
+The initial design uses a single [Bird](file:///Users/mdkaif/Desktop/LLD/scaler/class1/Main.java#3-28) class with an `if-else` block to handle different flying behaviors based on the `type` attribute.
+
+```mermaid
+classDiagram
+    class Bird {
+        +String type
+        +int age
+        +double height
+        +double weight
+        +Bird(String type, int age, double height, double weight)
+        +fly()
+    }
+```
+> **Note:** The [fly()](file:///Users/mdkaif/Desktop/LLD/scaler/class1/Main.java#213-216) method contains conditional logic like `if(type.equals("Hen"))`.
+
+### v1: Basic Inheritance
+Transitioning to inheritance to improve maintainability and separate concerns.
+
+```mermaid
+classDiagram
+    class Bird1 {
+        +int age
+        +double height
+        +double weight
+        +Bird1(int age, double height, double weight)
+        +fly()
+    }
+    class Hen {
+        +Hen(int age, double height, double weight)
+        +fly()
+    }
+    class Eagle {
+        +Eagle(int age, double height, double weight)
+        +fly()
+    }
+    Bird1 <|-- Hen : Inheritance
+    Bird1 <|-- Eagle : Inheritance
+```
+
+### v2: Abstraction (Enforcing Contracts)
+Using an abstract class and abstract method to prevent the "Silent Killer" (unintended default behavior) and enforce implementation in subclasses.
+
+```mermaid
+classDiagram
+    class Bird2 {
+        <<abstract>>
+        +int age
+        +double height
+        +double weight
+        +Bird2(int age, double height, double weight)
+        +fly()*
+    }
+    class Hen2 {
+        +Hen2(int age, double height, double weight)
+        +fly()
+    }
+    class Eagle2 {
+        +Eagle2(int age, double height, double weight)
+        +fly()
+    }
+    Bird2 <|-- Hen2 : Realization
+    Bird2 <|-- Eagle2 : Realization
+```
+
+---
+
+## Class 2: HR System & SOLID Principles
+
+### v0: Monolith (Breaking SRP)
+The [Employee](file:///Users/mdkaif/Desktop/LLD/scaler/class2/Main.java#10-33) class is responsible for both data and storage logic.
+
+```mermaid
+classDiagram
+    class Employee {
+        +String name
+        +String id
+        +String email
+        +String type
+        +int phoneNumber
+        +Employee(String name, String id, String email, String type, int phoneNumber)
+        +save()
+    }
+    class FullTimeEmployee {
+        +FullTimeEmployee(String name, String id, String email, String type, int phoneNumber)
+    }
+    class Intern {
+        +Intern(String name, String id, String email, String type, int phoneNumber)
+    }
+    Employee <|-- FullTimeEmployee
+    Employee <|-- Intern
+```
+
+### v1: Single Responsibility Principle (SRP)
+Decoupling storage and serialization logic from the data model.
+
+```mermaid
+classDiagram
+    class Employee {
+        +String name
+        +String id
+        +String email
+        +String type
+        +int phoneNumber
+    }
+    class Serializer {
+        +serialize(Employee e) String
+    }
+    class FileHandler {
+        +writeFile(String data)
+    }
+    class EmployeeRepository {
+        -List~Employee~ employees
+        +save(Employee e)
+    }
+    EmployeeRepository ..> Serializer : uses
+    EmployeeRepository ..> FileHandler : uses
+    EmployeeRepository o-- Employee : contains
+```
+
+### v2: Open-Closed Principle (OCP)
+Using interfaces and strategy patterns to make the system extensible without modifying existing code.
+
+```mermaid
+classDiagram
+    class Employee {
+        +String name
+        +String id
+        +TaxCalculator taxCalculator
+        +calculateIncomeTax() double
+    }
+    class TaxCalculator {
+        <<interface>>
+        +calculateTax(Employee e)* double
+    }
+    class FTHTaxCalculator {
+        +calculateTax(Employee e) double
+    }
+    class InternTaxCalculator {
+        +calculateTax(Employee e) double
+    }
+    
+    Employee "1" o-- "1" TaxCalculator : composition
+    TaxCalculator <|.. FTHTaxCalculator : realization
+    TaxCalculator <|.. InternTaxCalculator : realization
+
+    class FullTimeEmployee {
+        +FullTimeEmployee()
+    }
+    class Intern {
+        +Intern()
+    }
+    Employee <|-- FullTimeEmployee
+    Employee <|-- Intern
+```
