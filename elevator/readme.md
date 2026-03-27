@@ -231,6 +231,12 @@ This approach is brittle and hard to maintain. The State Pattern **encapsulates*
 - **Self-Managed Transitions**: A state can trigger the next state (e.g., `MovingUp` transitions to `Idle` once the destination is reached).
 - **Easy Extensibility**: Adding an `EmergencyState` or `FireAlarmState` requires adding a new class, not modifying 50 lines of `if-else` in the core Elevator class.
 
+### 🎯 5.5 State Transitions within the "Function Box"
+The instructor emphasized that transitions should occur **inside the state methods** (the "Function Box"):
+- **Encapsulation**: All the state-specific behavior and **logic for moving to the next state** is hidden inside the respective state classes (e.g., `MovingUpState`, `IdleState`).
+- **Dynamic Flow**: Transitions happen dynamically within these class methods. For example, `MovingUpState.handle()` determines when the elevator has arrived and calls `elevator.setState(new IdleState())` internally.
+- **Clean Context**: This keeps the main `Elevator` class entirely free from the responsibility of knowing *when* or *how* to change states.
+
 ---
 
 ## 🔥 6. Interview Grilling Points (SDE-2/3 Insights)
@@ -331,7 +337,7 @@ class FIFOSchedulingStrategy implements TaskSchedulingStrategy {
 class Elevator implements Runnable {
     private final int id;
     private int currentFloor = 1;
-    private State state = new IdleState();
+    private StateType state = StateType.IDLE;
     private final Queue<Integer> floorQueue = new ConcurrentLinkedQueue<>();
     private final List<ElevatorObserver> observers = new CopyOnWriteArrayList<>();
     private final TaskSchedulingStrategy scheduler = new FIFOSchedulingStrategy();
