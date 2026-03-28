@@ -1,44 +1,40 @@
 package com.ratelimiter;
 
-import com.ratelimiter.models.ExternalService;
-import com.ratelimiter.proxy.RateLimiterProxy;
-import com.ratelimiter.strategies.SlidingWindowStrategy;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import com.ratelimiter.proxy.*;
+import com.ratelimiter.strategies.*;
 
 public class Main {
     public static void main(String[] args) throws InterruptedException {
-        System.out.println("🛡️ Starting Rate Limiter System Simulation");
-        System.out.println("==========================================\n");
+        System.out.println("Starting Rate Limiter Simulation (Final Refinement)");
+        System.out.println("==================================================\n");
 
-        // 1. Configure the Rate Limiter: 3 requests per 5 seconds
-        SlidingWindowStrategy strategy = new SlidingWindowStrategy(3, 5);
-        ExternalService proxy = new RateLimiterProxy(strategy);
+        // 1. Setup Simulation with FixedWindowCounter (5 req per 2 sec)
+        System.out.println("--- Testing Fixed Window (5 req/2sec) via Service ---");
+        RateLimitStrategy fixedCounter = new FixedWindowCounter(5, 2000);
+        RemoteResourceProxy proxy = new RemoteResourceProxy(fixedCounter);
+        Service service = new Service(proxy);
 
-        // 2. Simulate concurrent requests using an ExecutorService
-        ExecutorService executor = Executors.newFixedThreadPool(5);
-
-        System.out.println("🚀 [Simulation] Sending 10 simultaneous requests...\n");
-
-        for (int i = 1; i <= 10; i++) {
-            final int requestId = i;
-            executor.submit(() -> {
-                String response = proxy.callApi("Request #" + requestId);
-                System.out.println("[Client] Result for Request " + requestId + ": " + response);
-            });
+        for (int i = 1; i <= 8; i++) {
+            System.out.print("Iteration " + i + ": ");
+            service.someMethod(true); // Trigger remote call
+            Thread.sleep(200);
         }
 
-        executor.shutdown();
-        executor.awaitTermination(10, TimeUnit.SECONDS);
+        System.out.println("\nWaiting for window reset...");
+        Thread.sleep(2000);
 
-        System.out.println("\n--- ⏳ Waiting for window to reset (6 seconds) ---");
-        Thread.sleep(6000);
+        // 2. Setup Simulation with SlidingWindowCounter (3 req per 1 sec)
+        System.out.println("\n--- Testing Sliding Window (3 req/1sec) via Service ---");
+        RateLimitStrategy slidingCounter = new SlidingWindowCounter(3, 1000);
+        RemoteResourceProxy slidingProxy = new RemoteResourceProxy(slidingCounter);
+        Service slidingService = new Service(slidingProxy);
 
-        System.out.println("\n🚀 [Simulation] Sending another request after window reset...");
-        System.out.println("[Client] Result: " + proxy.callApi("Post-Window Request"));
+        for (int i = 1; i <= 5; i++) {
+            System.out.print("Iteration " + i + ": ");
+            slidingService.someMethod(true);
+            Thread.sleep(200);
+        }
 
-        System.out.println("\n==========================================");
-        System.out.println("🛡️ Simulation Completed.");
+        System.out.println("\nSimulation completed.");
     }
 }

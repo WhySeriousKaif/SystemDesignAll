@@ -1,31 +1,30 @@
 package com.ratelimiter.strategies;
 
-import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.Deque;
+import java.util.Queue;
+import java.util.concurrent.ConcurrentLinkedQueue;
 
-public class SlidingWindowStrategy implements RateLimitingStrategy {
+public class SlidingWindowStrategy implements RateLimitStrategy {
     private final int maxRequests;
     private final long windowSizeMillis;
-    private final Deque<Long> requestTimestamps;
+    private final Queue<Long> requestTimestamps;
 
-    public SlidingWindowStrategy(int maxRequests, int windowSeconds) {
+    public SlidingWindowStrategy(int maxRequests, long windowSizeMillis) {
         this.maxRequests = maxRequests;
-        this.windowSizeMillis = windowSeconds * 1000L;
-        this.requestTimestamps = new ConcurrentLinkedDeque<>();
+        this.windowSizeMillis = windowSizeMillis;
+        this.requestTimestamps = new ConcurrentLinkedQueue<>();
     }
 
     @Override
-    public synchronized boolean isAllowed() {
+    public synchronized boolean allowRequest() {
         long currentTime = System.currentTimeMillis();
-        long windowStart = currentTime - windowSizeMillis;
-
-        // Remove timestamps outside the current window
-        while (!requestTimestamps.isEmpty() && requestTimestamps.peekFirst() < windowStart) {
-            requestTimestamps.pollFirst();
+        
+        // Remove timestamps outside the sliding window
+        while (!requestTimestamps.isEmpty() && currentTime - requestTimestamps.peek() > windowSizeMillis) {
+            requestTimestamps.poll();
         }
 
         if (requestTimestamps.size() < maxRequests) {
-            requestTimestamps.addLast(currentTime);
+            requestTimestamps.add(currentTime);
             return true;
         }
 

@@ -273,6 +273,138 @@ classDiagram
 ```
 
 ---
+```mermaid
+classDiagram
+
+    class ParkingLot {
+        <<singleton>>
+        -List~Level~ levels
+        -List~Gate~ gates
+        +getInstance()
+    }
+
+    class ParkingService {
+        -SlotAllocationStrategy slotStrategy
+        -PricingStrategy pricingStrategy
+        -PaymentService paymentService
+        +park(Vehicle, Gate) Ticket
+        +exit(Ticket, LocalDateTime) Bill
+    }
+
+    class Level {
+        -int floorNumber
+        -List~ParkingSlot~ slots
+    }
+
+    class ParkingSlot {
+        -String slotId
+        -SlotType type
+        -boolean isOccupied
+        -Map~Gate, Integer~ distanceMap
+        +occupy(Vehicle)
+        +vacate()
+    }
+
+    class Gate {
+        <<abstract>>
+        -String gateId
+        -int floorNumber
+    }
+
+    class EntryGate {
+        +requestParking(Vehicle)
+    }
+
+    class ExitGate {
+        +processExit(Ticket)
+    }
+
+    class Vehicle {
+        -String licensePlate
+        -VehicleType type
+    }
+
+    class Ticket {
+        -String ticketId
+        -Vehicle vehicle
+        -ParkingSlot slot
+        -LocalDateTime entryTime
+    }
+
+    class Bill {
+        -double amount
+        -LocalDateTime exitTime
+    }
+
+    class DisplayBoard {
+        -Map~SlotType, Integer~ availability
+        +showStatus()
+    }
+
+    class SlotAllocationStrategy {
+        <<interface>>
+        +findSlot(VehicleType, Gate)
+    }
+
+    class NearestSlotStrategy {
+        -Map~Gate, TreeSet~ slots
+    }
+
+    class PricingStrategy {
+        <<interface>>
+        +calculateAmount(Ticket, LocalDateTime)
+    }
+
+    class HourlyPricingStrategy
+    class WeekendPricingStrategy
+
+    class PaymentService {
+        +processPayment(double)
+    }
+
+    class VehicleType {
+        <<enum>>
+        BIKE
+        CAR
+        TRUCK
+    }
+
+    class SlotType {
+        <<enum>>
+        SMALL
+        MEDIUM
+        LARGE
+    }
+
+    %% Relationships
+    ParkingLot *-- Level
+    ParkingLot *-- Gate
+    ParkingLot o-- DisplayBoard
+
+    ParkingService --> ParkingLot
+    ParkingService --> SlotAllocationStrategy
+    ParkingService --> PricingStrategy
+    ParkingService --> PaymentService
+
+    EntryGate --> ParkingService
+    ExitGate --> ParkingService
+
+    Level *-- ParkingSlot
+
+    Gate <|-- EntryGate
+    Gate <|-- ExitGate
+
+    SlotAllocationStrategy <|.. NearestSlotStrategy
+    PricingStrategy <|.. HourlyPricingStrategy
+    PricingStrategy <|.. WeekendPricingStrategy
+
+    Vehicle --> VehicleType
+    ParkingSlot --> SlotType
+
+    Ticket --> Vehicle
+    Ticket --> ParkingSlot
+    Bill --> Ticket
+```
 
 # 🅿️  Part 3: Parking Lot Design
 

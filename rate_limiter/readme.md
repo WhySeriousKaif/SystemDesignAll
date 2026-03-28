@@ -1,145 +1,134 @@
-# 🛡️ Rate Limiter System & Proxy Design Pattern (Complete Guide)
+# 🛡️ Rate Limiter System LLD (Proxy + Strategy)
 
-A production-ready, thread-safe Rate Limiter implementation using the **Proxy** and **Strategy** design patterns. This guide covers the full implementation, architectural rationale, and deep-dive notes for the Proxy pattern.
+A production-grade, interview-perfect Rate Limiter designed to protect external APIs using behavioral design patterns for maximum flexibility and decoupling.
 
 ---
 
-## 1. 🔍 Proxy Design Pattern - Deep Dive
+## 🏗️ 1. Architectural Design Patterns
 
-### 📋 Overview
-The **Proxy Design Pattern** is a **structural design pattern** that creates a **proxy object** (reference) to act as an intermediary for a real object. 
+This system is built using the core design patterns recommended for SDE-2/3 interviews:
 
-**Key Objectives:**
-- **Access Control**: Validate requests before they reach the real object.
-- **Lazy Initialization**: Delay the creation of expensive objects until they are actually needed.
-- **Extra Functionality**: Add logging, caching, or rate limiting without modifying the core business logic.
+| Pattern | Role | Benefit |
+| :--- | :--- | :--- |
+| **Proxy Pattern** | `RemoteResourceProxy` | Encapsulates the rate-limiting logic, keeping the functional code clean. |
+| **Strategy Pattern** | `RateLimitStrategy` | Decouples the algorithm (`FixedWindow`, `SlidingWindow`) from the proxy. |
 
-### 🏦 Real-World Example: ATM Proxy
-An ATM acts as a proxy for your bank account. It handles PIN validation and balance checks locally before delegating the final transaction to the bank's central system.
+---
 
-### 📊 Proxy Pattern UML
+## 📊 2. UML Diagram (Instructor Standard)
+
+### 🧩 2.1 Technical Mermaid Diagram
 ```mermaid
 classDiagram
-    class Subject {
+    class RateLimitStrategy {
         <<Interface>>
-        +operation()
+        +canProceed() boolean
     }
-    class RealSubject {
-        +operation()
+
+    class FixedWindowCounter {
+        -int counter
+        -long windowStartTime
+        -int limit
+        +canProceed() boolean
     }
-    class Proxy {
-        -RealSubject realSubject
-        +operation()
+
+    class SlidingWindowCounter {
+        -Queue requestTimestamps
+        -int limit
+        +canProceed() boolean
     }
-    Subject <|.. RealSubject
-    Subject <|.. Proxy
-    Proxy o-- RealSubject : delegates to
+
+    class RemoteResourceProxy {
+        -RateLimitStrategy rateLimitStrategy
+        +generate()
+        -actualRemoteApiCall()
+    }
+
+    class Service {
+        -RemoteResourceProxy remoteResourceProxy
+        +someMethod(someCondition)
+    }
+
+    %% Relationships
+    RemoteResourceProxy o-- RateLimitStrategy : Uses (Strategy Pattern)
+    FixedWindowCounter ..|> RateLimitStrategy : Implements
+    SlidingWindowCounter ..|> RateLimitStrategy : Implements
+    Service o-- RemoteResourceProxy : Uses (Proxy Pattern)
 ```
 
 ---
 
-## 2. 🏗️ Rate Limiter Architecture
+## ⚙️ 3. Rate Limiting Algorithms
 
-### 🛡️ Design Strategy
-- **Proxy Pattern**: `RateLimiterProxy` wraps the `RealExternalService`.
-- **Strategy Pattern**: `RateLimitingStrategy` allows swapping algorithms (e.g., Sliding Window, Token Bucket).
-- **Thread-Safety**: Uses `ConcurrentLinkedDeque` and Double-Checked Locking for lazy initialization.
+### 3.1. Fixed Window Counter
+- **Concept**: Timeline is divided into fixed buckets.
+- **Pros**: Simple to implement.
+- **Cons**: **Burst Issue**—Could allow twice the limit at window boundaries.
 
-### 📊 System UML Diagram
-```mermaid
-classDiagram
-    class ExternalService {
-        <<Interface>>
-        +callApi(String request) String
-    }
-    class RealExternalService {
-        +callApi(String request) String
-    }
-    class RateLimiterProxy {
-        -RealExternalService realService
-        -RateLimitingStrategy strategy
-        +callApi(String request) String
-    }
-    class RateLimitingStrategy {
-        <<Interface>>
-        +isAllowed() boolean
-    }
-    class SlidingWindowStrategy {
-        -Deque~Long~ timestamps
-        +isAllowed() boolean
-    }
-
-    ExternalService <|.. RealExternalService
-    ExternalService <|.. RateLimiterProxy
-    RateLimiterProxy o-- RateLimitingStrategy
-    RateLimiterProxy o-- RealExternalService : Lazy Init
-    RateLimitingStrategy <|.. SlidingWindowStrategy
-```
+### 3.2. Sliding Window Counter
+- **Concept**: Always looks at the *most recent* sliding interval.
+- **Pros**: **Smoother enforcement**—prevents the boundary burst issue.
+- **Cons**: Slightly more complex (uses a Queue for timestamps).
 
 ---
 
-## 💻 3. Full Java Implementation
+## 🔥 4. Interview "Grilling" Points (Masterclass)
 
-### 3.1 Core Rate Limiter Logic
+### 🎯 4.1 Proxy vs. Service/Controller Layer
+**Interview Explanation:** "We don't implement rate limiting at the Controller level because remote API calls are often **conditional**. Implementing it high-up is **too broad**. The **Proxy Pattern** allows for **precise implementation** only where the remote call actually happens."
+
+### 🎭 4.2 Client-Side Bypassing (The "Hotstar" Example)
+**Interview Explanation:** "Client-side limits (like clearing local storage to watch more match time on Hotstar) are easily bypassed via Postman or `curl`. For **Security/Strict Enforcement**, server-side rate limiting via a Proxy is non-negotiable."
+
+---
+
+## 🚀 5. Implementation Strategy (The "Function Box")
+- **Encapsulation**: All state-specific behavior and transition logic is hidden inside the state/strategy classes.
+- **Dynamic Behavior**: The system transitions smoothly between allowing and blocking based on the internal counters of the "Function Box" (the strategy methods).
+
+---
+
+## 💻 6. Simple Java Demo (Single-File)
+
 ```java
-// RateLimiterProxy.java
-public class RateLimiterProxy implements ExternalService {
-    private volatile RealExternalService realService;
-    private final RateLimitingStrategy strategy;
+import java.util.*;
 
-    public RateLimiterProxy(RateLimitingStrategy strategy) {
-        this.strategy = strategy;
-    }
+// 1. Strategy Pattern
+interface RateLimitStrategy { boolean canProceed(); }
 
-    @Override
-    public String callApi(String request) {
-        if (strategy.isAllowed()) {
-            if (realService == null) {
-                synchronized (this) {
-                    if (realService == null) {
-                        realService = new RealExternalService();
-                    }
-                }
-            }
-            return realService.callApi(request);
-        }
-        return "429 Too Many Requests - Limit Exceeded";
+class FixedWindowCounter implements RateLimitStrategy {
+    private int counter = 0;
+    private long start = System.currentTimeMillis();
+    public synchronized boolean canProceed() {
+        if (System.currentTimeMillis() - start > 1000) { counter = 0; start = System.currentTimeMillis(); }
+        return counter++ < 5; // 5 req/sec
     }
 }
-```
 
-### 3.2 Main Simulation Code
-```java
-// Main.java
+// 2. Proxy Pattern
+class RemoteResourceProxy {
+    private RateLimitStrategy strategy;
+    public RemoteResourceProxy(RateLimitStrategy s) { this.strategy = s; }
+    public void generate() {
+        if (strategy.canProceed()) System.out.println("API Success ✅");
+        else throw new RuntimeException("429 Too Many Requests 🛑");
+    }
+}
+
+// 3. Service Layer
+class Service {
+    private RemoteResourceProxy proxy;
+    public Service(RemoteResourceProxy p) { this.proxy = p; }
+    public void someMethod() {
+        try { proxy.generate(); } catch (Exception e) { System.err.println(e.getMessage()); }
+    }
+}
+
+// 4. Driver
 public class Main {
-    public static void main(String[] args) throws InterruptedException {
-        SlidingWindowStrategy strategy = new SlidingWindowStrategy(3, 5); // 3 req / 5 sec
-        ExternalService proxy = new RateLimiterProxy(strategy);
-
-        ExecutorService executor = Executors.newFixedThreadPool(5);
-        for (int i = 1; i <= 10; i++) {
-            executor.submit(() -> {
-                System.out.println(proxy.callApi("Request"));
-            });
-        }
-        executor.shutdown();
+    public static void main(String[] args) {
+        Service service = new Service(new RemoteResourceProxy(new FixedWindowCounter()));
+        for (int i = 0; i < 8; i++) service.someMethod();
     }
 }
-```
-
----
-
-## 🔥 4. Interview "Killer Lines" (Proxy Pattern)
-
-> [!IMPORTANT]
-> "Proxy pattern isn't just a wrapper; it's a **gatekeeper**. It manages the lifecycle and access permissions of the real object, ensuring that expensive resources are only initialized for valid, authorized requests."
-
-> [!TIP]
-> "By combining Proxy with the Strategy pattern, we decouple the **protection logic** (Proxy) from the **algorithm** (Strategy), making the system highly extensible."
-
----
-
-## 🚀 5. How to Run
-```bash
-bash run_rate_limiter.sh
 ```
