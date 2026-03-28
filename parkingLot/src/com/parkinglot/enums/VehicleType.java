@@ -1,4 +1,4 @@
-package com.parkingLot.enums;
+package com.parkinglot.enums;
 
 public enum VehicleType {
     BIKE,
