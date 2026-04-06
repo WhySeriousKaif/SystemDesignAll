@@ -14,12 +14,11 @@ public class RemoteResourceProxy implements IRemoteResource {
     }
 
     @Override
-    public void callAPI() {
-
-        if (strategy.canProceed()) {
-            realResource.callAPI();
+    public void callAPI(String key) {
+        if (strategy.canProceed(key)) {
+            realResource.callAPI(key);
         } else {
-            System.err.println("429 Too Many Requests - Rejected by Proxy");
+            System.err.println("429 Too Many Requests for key: " + key + " - Rejected by Proxy");
         }
     }
 }

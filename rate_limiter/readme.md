@@ -4,6 +4,106 @@ A production-grade, interview-ready Rate Limiter designed to protect external AP
 
 ---
 
+# 🛡️ Pluggable Rate Limiting System (External Resource Protection)
+
+This system is designed specifically for protecting **paid external resources**. It uses the **Proxy** and **Strategy** design patterns to achieve a highly pluggable, per-key, and tiered rate limiting solution.
+
+---
+
+## 🎨 Professional UML Design
+```mermaid
+classDiagram
+    %% Architecture Layers
+    class Service {
+        -IRemoteResource resource
+        +process(String key)
+    }
+
+    class IRemoteResource {
+        <<interface>>
+        +callAPI(String key)
+    }
+
+    class RemoteResourceProxy {
+        -IRemoteResource realResource
+        -RateLimitStrategy strategy
+        +callAPI(String key)
+    }
+
+    class RateLimitStrategy {
+        <<interface>>
+        +canProceed(String key)
+    }
+
+    %% Algorithms
+    class FixedWindowCounter { -Map~String, WindowData~ keyData }
+    class SlidingWindowCounter { -Map~String, Queue~ keyTimestamps }
+    class TokenBucketStrategy { -Map~String, BucketData~ keyBuckets }
+    class LeakyBucketStrategy { -Map~String, BucketData~ keyBuckets }
+    class SlidingLogStrategy { -Map~String, TreeSet~ keyLogs }
+    class CompositeRateLimitStrategy { -List~RateLimitStrategy~ strategies }
+
+    %% Relationships
+    Service --> IRemoteResource : invokes
+    IRemoteResource <|.. RemoteResourceProxy : gateway
+    IRemoteResource <|.. RealRemoteResource : implementation
+    RemoteResourceProxy --> RateLimitStrategy : delegates check
+    RateLimitStrategy <|.. FixedWindowCounter
+    RateLimitStrategy <|.. SlidingWindowCounter
+    RateLimitStrategy <|.. TokenBucketStrategy
+    RateLimitStrategy <|.. LeakyBucketStrategy
+    RateLimitStrategy <|.. SlidingLogStrategy
+    RateLimitStrategy <|.. CompositeRateLimitStrategy
+```
+
+---
+
+## 🧠 Design Decisions & SOLID Principles
+
+### 1. Proxy Pattern (Structural)
+**Why?** We wrap the `RealRemoteResource` with a `RemoteResourceProxy`. 
+- **Separation of Concerns**: The business service doesn't know it's being rate-limited.
+- **Transparency**: The Proxy implements the `IRemoteResource` interface, making it a drop-in replacement.
+- **Single Responsibility (SRP)**: The real resource focus on networking; the proxy focuses on protection.
+
+### 2. Strategy Pattern (Behavioral)
+**Why?** We inject different algorithms into the Proxy.
+- **Open/Closed Principle (OCP)**: We can add new algorithms (like Leaky Bucket) by implementing the `RateLimitStrategy` interface without changing the Proxy or Service code.
+- **Interchangeability**: The algorithm can be swapped at runtime (e.g., switching to Token Bucket for better burst support).
+
+### 3. Per-Key Rate Limiting
+**Why?** The `canProceed(String key)` method allows the system to distinguish between **Tenants, Users, or API Keys**, ensuring that one noisy neighbor doesn't exhaust the quota for others.
+
+---
+
+## 📊 Comparison of Algorithms (Trade-offs)
+
+| Algorithm | Pros | Cons | Best For... |
+| :--- | :--- | :--- | :--- |
+| **Fixed Window** | Low memory, very fast. | Boundary problem: Can allow 2x traffic at edges. | Low precision, high scale. |
+| **Sliding Window** | Smoother than Fixed Window. | Needs more memory to store timestamps. | General usage. |
+| **Token Bucket** | Handles bursts well, high performance. | Complex refill math. | API protection with burst allowance. |
+| **Leaky Bucket** | Ensures constant output rate. | Rejects bursts immediately if bucket is full. | Smoothing traffic to unstable backends. |
+| **Sliding Log** | Perfectly smooth, 100% accurate. | Extreme memory usage (stores every event). | High accuracy, low volume requirements. |
+
+---
+
+## 🚀 How to Use (Composite Limits)
+
+To support rules like **"5 requests per minute AND 100 per hour"**, use the `CompositeRateLimitStrategy`:
+
+```java
+CompositeRateLimitStrategy tieredLimit = new CompositeRateLimitStrategy();
+tieredLimit.addStrategy(new FixedWindowCounter(5, 60000));     // 5/min
+tieredLimit.addStrategy(new FixedWindowCounter(100, 3600000)); // 100/hr
+
+IRemoteResource protectedAPI = new RemoteResourceProxy(new RealRemoteResource(), tieredLimit);
+protectedAPI.callAPI("UserT1");
+```
+
+
+
+
 ## 🏗️ 1. Architectural Design Theory
 
 ### 🎭 The Proxy Pattern (The Gatekeeper)
@@ -280,104 +380,7 @@ Service --> RealRemoteResource : directly calls
 ---
 
 
-```mermaid
-classDiagram
 
-%% =========================
-%% SERVICE LAYER
-%% =========================
-class Service {
-    -IRemoteResource proxy
-    +process() void
-}
-
-%% =========================
-%% REMOTE RESOURCE INTERFACE
-%% =========================
-class IRemoteResource {
-    <<interface>>
-    +callAPI() void
-}
-
-%% =========================
-%% PROXY (MAIN CONTROL)
-%% =========================
-class RemoteResourceProxy {
-    -IRemoteResource realResource
-    -RateLimitStrategy strategy
-    +RemoteResourceProxy(IRemoteResource, RateLimitStrategy)
-    +callAPI() void
-}
-
-%% =========================
-%% REAL IMPLEMENTATIONS
-%% =========================
-class CloudProxy {
-    +callAPI() void
-}
-
-class PaymentProxy {
-    +callAPI() void
-}
-
-class RealRemoteResource {
-    +callAPI() void
-}
-
-%% =========================
-%% RATE LIMIT STRATEGY
-%% =========================
-class RateLimitStrategy {
-    <<interface>>
-    +canProceed() boolean
-}
-
-%% =========================
-%% STRATEGY IMPLEMENTATIONS
-%% =========================
-class FixedWindowCounter {
-    -int counter
-    -long windowStart
-    -int limit
-    -long windowSize
-    +canProceed() boolean
-}
-
-class SlidingWindowCounter {
-    -Queue~Long~ timestamps
-    -int limit
-    -long windowSize
-    +canProceed() boolean
-}
-
-class TokenBucketStrategy {
-    -double tokens
-    -double refillRate
-    -long lastRefillTime
-    +canProceed() boolean
-}
-
-%% =========================
-%% RELATIONSHIPS
-%% =========================
-
-Service --> IRemoteResource : calls (inside if condition)
-
-IRemoteResource <|.. RemoteResourceProxy : implements
-
-RemoteResourceProxy --> IRemoteResource : delegates to real API
-
-RemoteResourceProxy --> RateLimitStrategy : uses (composition)
-
-RateLimitStrategy <|.. FixedWindowCounter : implements
-RateLimitStrategy <|.. SlidingWindowCounter : implements
-RateLimitStrategy <|.. TokenBucketStrategy : implements
-
-IRemoteResource <|.. CloudProxy : implements
-IRemoteResource <|.. PaymentProxy : implements
-IRemoteResource <|.. RealRemoteResource : implements
-
-```
 
 ## 💻 3. COMPLETE SOURCE CODE
 

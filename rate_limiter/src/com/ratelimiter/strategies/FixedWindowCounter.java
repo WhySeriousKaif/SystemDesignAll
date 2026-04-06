@@ -1,30 +1,43 @@
 package com.ratelimiter.strategies;
 
+import java.util.concurrent.ConcurrentHashMap;
+
 public class FixedWindowCounter implements RateLimitStrategy {
-    private int counter;
-    private long windowStartTime;
     private final int limit;
     private final long windowSizeInMillis;
+    private final ConcurrentHashMap<String, WindowData> keyData = new ConcurrentHashMap<>();
+
+    private static class WindowData {
+        int counter;
+        long windowStartTime;
+
+        WindowData(long startTime) {
+            this.windowStartTime = startTime;
+            this.counter = 0;
+        }
+    }
 
     public FixedWindowCounter(int limit, long windowSizeInMillis) {
         this.limit = limit;
         this.windowSizeInMillis = windowSizeInMillis;
-        this.windowStartTime = System.currentTimeMillis();
     }
 
     @Override
-    public synchronized boolean canProceed() {
+    public boolean canProceed(String key) {
         long currentTime = System.currentTimeMillis();
-        // Check if window has expired
-        if (currentTime - windowStartTime >= windowSizeInMillis) {
-            counter = 0;
-            windowStartTime = currentTime;
-            System.out.println("[Strategy] Fixed window reset.");
-        }
+        
+        WindowData data = keyData.compute(key, (k, v) -> {
+            if (v == null || currentTime - v.windowStartTime >= windowSizeInMillis) {
+                return new WindowData(currentTime);
+            }
+            return v;
+        });
 
-        if (counter < limit) {
-            counter++;
-            return true;
+        synchronized (data) {
+            if (data.counter < limit) {
+                data.counter++;
+                return true;
+            }
         }
         return false;
     }

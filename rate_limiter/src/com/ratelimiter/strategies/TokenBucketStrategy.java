@@ -1,6 +1,5 @@
 package com.ratelimiter.strategies;
 
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Token Bucket Algorithm:
@@ -10,41 +9,48 @@ import java.util.concurrent.locks.ReentrantLock;
  * - If the bucket is empty, the request is rejected.
  * - Best for: Allowing bursts of traffic up to the capacity.
  */
+import java.util.concurrent.ConcurrentHashMap;
+
 public class TokenBucketStrategy implements RateLimitStrategy {
     private final long capacity;
     private final double refillRatePerMs;
-    private double currentTokens;
-    private long lastRefillTime;
-    private final ReentrantLock lock = new ReentrantLock();
+    private final ConcurrentHashMap<String, BucketData> keyBuckets = new ConcurrentHashMap<>();
+
+    private static class BucketData {
+        double currentTokens;
+        long lastRefillTime;
+
+        BucketData(double capacity) {
+            this.currentTokens = capacity;
+            this.lastRefillTime = System.currentTimeMillis();
+        }
+    }
 
     public TokenBucketStrategy(long capacity, int refillRatePerSecond) {
         this.capacity = capacity;
         this.refillRatePerMs = (double) refillRatePerSecond / 1000.0;
-        this.currentTokens = capacity;
-        this.lastRefillTime = System.currentTimeMillis();
     }
 
     @Override
-    public boolean canProceed() {
-        lock.lock();
-        try {
-            refill();
-            if (currentTokens >= 1.0) {
-                currentTokens -= 1.0;
+    public boolean canProceed(String key) {
+        BucketData data = keyBuckets.computeIfAbsent(key, k -> new BucketData(capacity));
+
+        synchronized (data) {
+            refill(data);
+            if (data.currentTokens >= 1.0) {
+                data.currentTokens -= 1.0;
                 return true;
             }
             return false;
-        } finally {
-            lock.unlock();
         }
     }
 
-    private void refill() {
+    private void refill(BucketData data) {
         long now = System.currentTimeMillis();
-        long timeElapsed = now - lastRefillTime;
+        long timeElapsed = now - data.lastRefillTime;
         double tokensToAdd = timeElapsed * refillRatePerMs;
         
-        currentTokens = Math.min(capacity, currentTokens + tokensToAdd);
-        lastRefillTime = now;
+        data.currentTokens = Math.min(capacity, data.currentTokens + tokensToAdd);
+        data.lastRefillTime = now;
     }
 }

@@ -1,5 +1,5 @@
 package com.ratelimiter.proxy;
 
 public interface IRemoteResource {
-    void callAPI();
+    void callAPI(String key);
 }

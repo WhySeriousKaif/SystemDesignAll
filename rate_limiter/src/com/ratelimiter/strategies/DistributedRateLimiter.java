@@ -22,21 +22,24 @@ public class DistributedRateLimiter implements RateLimitStrategy {
     }
 
     @Override
-    public boolean canProceed() {
+    public boolean canProceed(String key) {
+        // Concatenate resourceKey with the caller key
+        String combinedKey = this.key + ":" + key;
+
         // Atomic INCR in Redis
-        int currentCount = redis.incr(key);
+        int currentCount = redis.incr(combinedKey);
 
         // If it's the first request in the window, set expiry
         if (currentCount == 1) {
-            redis.expire(key, windowSizeInMillis);
+            redis.expire(combinedKey, windowSizeInMillis);
         }
 
         if (currentCount <= limit) {
-            System.out.println("[Distributed] Request allowed. Current count: " + currentCount);
+            System.out.println("[Distributed] Request allowed for " + combinedKey + ". Current count: " + currentCount);
             return true;
         }
 
-        System.out.println("[Distributed] 429 Too Many Requests. Current count: " + currentCount);
+        System.out.println("[Distributed] 429 Too Many Requests for " + combinedKey + ". Current count: " + currentCount);
         return false;
     }
 }
