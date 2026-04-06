@@ -43,48 +43,91 @@ Imagine "Brand1" produces three models: **T1, T2, and T3**.
 3. Use setters to tweak only the varying attributes (`size`, `color`).
 
 #### 💻 Complete Implementation
-```java
-// 1. Prototype Class
-class Tshirt implements Cloneable {
-    String brand, type, size, color;
-    int threadCount;
+#### 💻 Complete Implementation (Professional Level)
 
-    // Heavy Constructor (Called only for Prototyping)
+This implementation uses a custom **`IPrototype`** interface and a **`Prototype Registry`** to manage master objects efficiently.
+
+```java
+import java.util.HashMap;
+import java.util.Map;
+
+// 1. The Prototype Interface (The "contract" for cloning)
+// We use a custom interface to avoid the complexities of Java's Cloneable marker interface.
+interface IPrototype<T> {
+    T copy();
+}
+
+// 2. Concrete Product (The T-Shirt)
+class Tshirt implements IPrototype<Tshirt> {
+    private final String brand, type; // Intrinsic (Shared) data
+    private final int threadCount;    // Intrinsic (Shared) data
+    private String size, color;       // Extrinsic (Specific) data
+
+    // Heavy Constructor (Used only for defining Master Prototypes)
     public Tshirt(String brand, String type, int threadCount) {
-        System.out.println(">>> [HEAVY] Calculating branding details for: " + type);
+        System.out.println(">>> [HEAVY] Calculating global branding for: " + type);
         this.brand = brand;
         this.type = type;
         this.threadCount = threadCount;
     }
 
-    @Override
-    public Tshirt clone() throws CloneNotSupportedException {
-        // bit-wise copy: Reserves memory and copies values without re-running constructor
-        return (Tshirt) super.clone();
+    // 3. Copy Constructor (The secret behind efficient cloning)
+    // This allows us to create a new object from an existing one instantly.
+    private Tshirt(Tshirt target) {
+        this.brand = target.brand;
+        this.type = target.type;
+        this.threadCount = target.threadCount;
+        this.size = target.size;
+        this.color = target.color;
     }
 
+    @Override
+    public Tshirt copy() {
+        // More robust than super.clone() as it uses the copy constructor.
+        return new Tshirt(this);
+    }
+
+    // Setters for the 'tweaks'
     public void setSize(String size) { this.size = size; }
     public void setColor(String color) { this.color = color; }
 
     public void display() {
-        System.out.println(String.format("[%s %s] Color: %s, Size: %s, Thread: %d", brand, type, color, size, threadCount));
+        System.out.println(String.format("[%s %s] Color: %s, Size: %s, Thread: %d", 
+            brand, type, color, size, threadCount));
     }
 }
 
-// 2. Execution Logic
+// 4. Prototype Registry (The Master Storage)
+class TshirtRegistry {
+    private Map<String, Tshirt> registry = new HashMap<>();
+
+    public void register(String key, Tshirt prototype) {
+        registry.put(key, prototype);
+    }
+
+    public Tshirt get(String key) {
+        // Always returns a FRESH CLONE, not the original master object!
+        return registry.get(key).copy();
+    }
+}
+
+// 5. Execution Demo
 public class PrototypeDemo {
-    public static void main(String[] args) throws CloneNotSupportedException {
-        // 1. Create prototypes (Heavy work done once)
-        Tshirt t1Prototype = new Tshirt("Brand1", "T1", 400);
+    public static void main(String[] args) {
+        // A. Setup Registry & Register Master Prototypes (Heavy work done once)
+        TshirtRegistry registry = new TshirtRegistry();
+        registry.register("T1", new Tshirt("Brand1", "ModelT1", 400));
+        registry.register("T2", new Tshirt("Brand1", "ModelT2", 600));
 
-        // 2. Create mass units by cloning (Instantaneous)
-        Tshirt shirt1 = t1Prototype.clone();
-        shirt1.setSize("M");
-        shirt1.setColor("Blue");
+        // B. Mass Produce by Cloning (Instantaneous)
+        System.out.println("\n--- Mass Producing Shirts ---");
+        Tshirt shirt1 = registry.get("T1");
+        shirt1.setSize("L");
+        shirt1.setColor("Black");
 
-        Tshirt shirt2 = t1Prototype.clone();
-        shirt2.setSize("XL");
-        shirt2.setColor("Red");
+        Tshirt shirt2 = registry.get("T1");
+        shirt2.setSize("S");
+        shirt2.setColor("White");
 
         shirt1.display();
         shirt2.display();
@@ -93,9 +136,9 @@ public class PrototypeDemo {
 ```
 
 #### 🌟 Key Advantages (Interviewer's Focus)
-1.  **Avoids Constructor Overload**: Drastically reduces overhead—the heavy computation is done once for each type (T1, T2, T3) instead of thousands of times.
-2.  **Efficient Scaling**: Creating 1,000,000 shirts becomes nearly instantaneous because cloning is a low-level binary copy.
-3.  **Segregation**: The client code doesn't need to know the complex "recipe" for a `T1 Shirt`; it just asks the master prototype for a copy.
+1.  **Registry Pattern**: By using a `TshirtRegistry`, the client doesn't need to hold references to all master prototypes.
+2.  **Copy Constructor**: Using a private copy constructor for the `copy()` method is safer and clearer than Java's built-in `Cloneable`.
+3.  **Encapsulation**: The master "template" remains unchanged in the registry, while the client modifies individual clones.
 
 ---
 

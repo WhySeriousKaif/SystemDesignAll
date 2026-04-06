@@ -4,37 +4,6 @@ A scalable, multi-car elevator management solution designed for high-concurrency
 
 ---
 
-## 📋 1. Requirements (Deep Dive)
-
-### Core Functions
-- **Multi-Car Coordination**: A central `ElevatorManager` (Singleton) assigns jobs.
-- **Directional External Calls**: `UP`/`DOWN` buttons on each floor.
-- **Internal Selection**: Floor buttons, `OPEN`, `CLOSE`, `ALARM`.
-- **States**: `Idle`, `Moving_Up`, `Moving_Down`, `Maintenance`.
-
-### Advanced Constraints
-- **Weight Limit**: 750kg threshold. If exceeded: **Do not close door** + **Play alarm**.
-- **Maintenance Mode**: Lifts or entire floors can be disabled.
-- **Job Scheduling**: System must optimize the order of stops (Elevator Algorithm / SCAN).
-- **Observer Updates**: Floor panels must reflect real-time car positions.
-
----
-
-## 🏗️ 2. High-Level Architecture
-
-We use a decoupled, autonomous approach following **SOLID** principles and critical expert feedback:
-
-| Component | Pattern | Responsibility |
-| :--- | :--- | :--- |
-| **ElevatorManager** | `Singleton` | Coordinates all cars. Delegates tasks but does not manage car position. |
-| **Elevator** | `Runnable` | Autonomous unit that handles its own movement, safety, and **Observers**. |
-| **ElevatorSelection** | `Strategy` | Manager picks the "best" car for a new floor request. |
-| **TaskScheduling** | `Strategy` | Car picks the order of stops (e.g., FIFO, SCAN). |
-| **ElevatorState** | `State` | Handles car-specific transitions (Moving $\iff$ Idle). |
-| **FloorPanels** | `Observer` | Subscribes directly to **individual car** updates. |
-
----
-
 ## 📊 3. Ultimate & Complete UML Diagram
 
 Below is the definitive architecture for an SDE-2/3 interview, meticulously mapped to the system requirements and instructor feedback.
@@ -154,6 +123,38 @@ classDiagram
 ```
 
 ---
+
+## 📋 1. Requirements (Deep Dive)
+
+### Core Functions
+- **Multi-Car Coordination**: A central `ElevatorManager` (Singleton) assigns jobs.
+- **Directional External Calls**: `UP`/`DOWN` buttons on each floor.
+- **Internal Selection**: Floor buttons, `OPEN`, `CLOSE`, `ALARM`.
+- **States**: `Idle`, `Moving_Up`, `Moving_Down`, `Maintenance`.
+
+### Advanced Constraints
+- **Weight Limit**: 750kg threshold. If exceeded: **Do not close door** + **Play alarm**.
+- **Maintenance Mode**: Lifts or entire floors can be disabled.
+- **Job Scheduling**: System must optimize the order of stops (Elevator Algorithm / SCAN).
+- **Observer Updates**: Floor panels must reflect real-time car positions.
+
+---
+
+## 🏗️ 2. High-Level Architecture
+
+We use a decoupled, autonomous approach following **SOLID** principles and critical expert feedback:
+
+| Component | Pattern | Responsibility |
+| :--- | :--- | :--- |
+| **ElevatorManager** | `Singleton` | Coordinates all cars. Delegates tasks but does not manage car position. |
+| **Elevator** | `Runnable` | Autonomous unit that handles its own movement, safety, and **Observers**. |
+| **ElevatorSelection** | `Strategy` | Manager picks the "best" car for a new floor request. |
+| **TaskScheduling** | `Strategy` | Car picks the order of stops (e.g., FIFO, SCAN). |
+| **ElevatorState** | `State` | Handles car-specific transitions (Moving $\iff$ Idle). |
+| **FloorPanels** | `Observer` | Subscribes directly to **individual car** updates. |
+
+---
+
 
 ## 💻 4. Production-Level Implementation (Java)
 

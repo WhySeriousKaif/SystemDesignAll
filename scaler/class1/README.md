@@ -111,6 +111,7 @@ this.weight = weight
 */
 ```
 ![Project](Screenshot%202026-03-11%20at%2011.27.30%E2%80%AFPM.png) 
+---
 Method call is decided at runtime based on the actual object type, not the reference type.
 
 

@@ -1,39 +1,14 @@
 package BookMyShow.Movie;
 
 public class Movie {
-    private int movieId;
-    private String movieName;
-    private int durationInMinutes;
+    private String title;
+    private int duration;
 
-    public Movie() {}
-
-    public Movie(int movieId, String movieName, int durationInMinutes) {
-        this.movieId = movieId;
-        this.movieName = movieName;
-        this.durationInMinutes = durationInMinutes;
+    public Movie(String title, int duration) {
+        this.title = title;
+        this.duration = duration;
     }
 
-    public int getMovieId() {
-        return movieId;
-    }
-
-    public void setMovieId(int movieId) {
-        this.movieId = movieId;
-    }
-
-    public String getMovieName() {
-        return movieName;
-    }
-
-    public void setMovieName(String movieName) {
-        this.movieName = movieName;
-    }
-
-    public int getDurationInMinutes() {
-        return durationInMinutes;
-    }
-
-    public void setDurationInMinutes(int durationInMinutes) {
-        this.durationInMinutes = durationInMinutes;
-    }
+    public String getTitle() { return title; }
+    public int getDuration() { return duration; }
 }

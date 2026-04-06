@@ -4,23 +4,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Screen {
-    int screenId;
-    List<Seat>seats=new ArrayList<>();
+    private String name;
+    private List<Seat> seats = new ArrayList<>();
 
-    public int getScreenId(){
-        return screenId;
-    }
+    public Screen(String name) { this.name = name; }
 
-    public void setScreenId(int screenId){
-        this.screenId=screenId;
-    }
-
-    public List<Seat> getSeats(){
-        return seats;
-    }
-
-    public void setSeats(List<Seat> seats){
-        this.seats=seats;
-    }
-    
+    public String getName() { return name; }
+    public List<Seat> getSeats() { return seats; }
 }

@@ -9,22 +9,39 @@ This session explores the **Factory Design Pattern** through the lens of a game 
 In our game, a character moves forward and must dodge three types of stones: `SmallStone`, `MediumStone`, and `LargeStone`.
 
 ```java
-// Product Interface
+// 1. The Interface
 interface Stone { void display(); }
 
-// Concrete Products
+// 2. Concrete Products
 class SmallStone implements Stone { public void display() { System.out.println("🪨 Small Stone"); } }
 class MediumStone implements Stone { public void display() { System.out.println("⛰️ Medium Stone"); } }
 class LargeStone implements Stone { public void display() { System.out.println("🏔️ Large Stone"); } }
 
-// Client code directly instantiating (VERBOSE & COUPLED)
-new SmallStone();
-new MediumStone();
-new LargeStone();
+// 3. The Problematic Client Code (Direct Instantiation)
+public class GameLoop {
+    private static int counter = 0;
+
+    public void run() {
+        while (gameIsRunning) {
+            Stone stone;
+            // PROBLEM: Hardcoded creation logic inside the core business loop
+            int choice = counter % 3;
+            if (choice == 0)      stone = new SmallStone();  // Tight Coupling
+            else if (choice == 1) stone = new MediumStone();
+            else                  stone = new LargeStone();
+
+            stone.display();
+            counter++;
+        }
+    }
+}
 ```
 
-**Why is this bad?**
-It tightly couples the game logic to specific stone classes. If we change a constructor or add a new stone type, we have to modify the core game loop. This violates the **Open/Closed Principle**.
+### 🚩 Why is this bad?
+1.  **Tight Coupling**: The `GameLoop` must know the exact names of all stone classes. If we rename a class, the core game logic breaks.
+2.  **Violation of Open/Closed Principle (OCP)**: Adding a new `GiantStone` requires modifyng the `if-else` block inside the `GameLoop`.
+3.  **Creation Logic Pollution**: The `GameLoop` should focus on physics/logic, not on *how* to construct objects or maintain a `counter` for sequencing.
+4.  **Poor Scalability**: If different levels need different generation logic (Random vs Uniform), the `GameLoop` becomes a mess of complex conditional branches.
 
 ---
 

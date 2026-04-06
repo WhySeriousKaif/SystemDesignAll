@@ -1,36 +1,16 @@
 package BookMyShow.theaters;
 
-import BookMyShow.enums.SeatCategory;
+import BookMyShow.enums.SeatType;
 
 public class Seat {
-    int seatId;
+    private String seatNumber;
+    private SeatType type;
 
-    int row;
-
-    SeatCategory seatCategory;
-
-    public int getSeatId(){
-        return seatId;
+    public Seat(String seatNumber, SeatType type) {
+        this.seatNumber = seatNumber;
+        this.type = type;
     }
 
-    public void setSeatId(int seatId){
-        this.seatId=seatId;
-    }
-
-    public int getRow(){
-        return row;
-    }
-
-    public void setRow(int row){
-        this.row=row;
-    }
-
-    public SeatCategory getSeatCategory(){
-        return seatCategory;
-    }
-
-    public void setSeatCategory(SeatCategory seatCategory){
-        this.seatCategory=seatCategory;
-    }
-    
+    public String getSeatNumber() { return seatNumber; }
+    public SeatType getType() { return type; }
 }
