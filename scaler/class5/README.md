@@ -5,610 +5,398 @@ This session covers powerful **Creational** and **Structural** design patterns: 
 ---
 
 ## 🏗️ Creational Patterns: Prototype
--->object creation of objects which are having heavy constructor
 
-### 🛑 The Problem: Heavy Object Creation
-Imagine a class with a **heavy constructor** (e.g., it performs complex math, hits an API, or parses a huge file).
+### 🧠 Prototype Pattern – Simple Version (Exam Ready)
 
+✅ **1. Interface**
 ```java
-class HeavyConstClass {
-    int a, b;
-    double c;
-    int t;
+interface Shape {
+    Shape copy();   // clone method
+}
+```
 
-    public HeavyConstClass(int a, int b, double c, int t) {
-        // Assume this constructor takes 2 seconds to run
-        this.a = a;
-        this.b = b;
-        this.c = c;
-        this.t = t;
+✅ **2. Concrete Class**
+```java
+class Rectangle implements Shape {
+    int width, height;
+
+    Rectangle(int w, int h) {
+        this.width = w;
+        this.height = h;
+    }
+
+    public Shape copy() {
+        return new Rectangle(width, height); // cloning
+    }
+
+    public void setWidth(int w) {
+        this.width = w;
+    }
+
+    public String toString() {
+        return "Rectangle: " + width + " x " + height;
     }
 }
 ```
 
-If we need 100 objects where `a, b, c` are identical and only `t` changes, calling `new HeavyConstClass(...)` 100 times is a massive waste of time and resources.
-
-### 🧩 The Solution: Prototype Pattern (The T-Shirt Story)
-Instead of creating a new object from scratch, we **clone** an existing one. 
-
-#### The Scenario: Brand1 Mass Production
-Imagine "Brand1" produces three models: **T1, T2, and T3**.
-- Each model has **heavy computations** in its constructor (calculating fabric quality, thread count, global brand standards).
-- There are thousands of shirts for each model.
-- Only the `size` and `color` change for each individual shirt.
-
-**The Strategy**: 
-1. Create **one master prototype** for each type (`T1`, `T2`, `T3`). The heavy constructor runs only **once** per type.
-2. For every new shirt, simply **clone** the corresponding prototype.
-3. Use setters to tweak only the varying attributes (`size`, `color`).
-
-#### 💻 Complete Implementation
-#### 💻 Complete Implementation (Professional Level)
-
-This implementation uses a custom **`IPrototype`** interface and a **`Prototype Registry`** to manage master objects efficiently.
-
+✅ **3. Registry**
 ```java
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 
-// 1. The Prototype Interface (The "contract" for cloning)
-// We use a custom interface to avoid the complexities of Java's Cloneable marker interface.
-interface IPrototype<T> {
-    T copy();
-}
+class ShapeRegistry {
+    private Map<String, Shape> map = new HashMap<>();
 
-// 2. Concrete Product (The T-Shirt)
-class Tshirt implements IPrototype<Tshirt> {
-    private final String brand, type; // Intrinsic (Shared) data
-    private final int threadCount;    // Intrinsic (Shared) data
-    private String size, color;       // Extrinsic (Specific) data
-
-    // Heavy Constructor (Used only for defining Master Prototypes)
-    public Tshirt(String brand, String type, int threadCount) {
-        System.out.println(">>> [HEAVY] Calculating global branding for: " + type);
-        this.brand = brand;
-        this.type = type;
-        this.threadCount = threadCount;
+    void register(String key, Shape shape) {
+        map.put(key, shape);
     }
 
-    // 3. Copy Constructor (The secret behind efficient cloning)
-    // This allows us to create a new object from an existing one instantly.
-    private Tshirt(Tshirt target) {
-        this.brand = target.brand;
-        this.type = target.type;
-        this.threadCount = target.threadCount;
-        this.size = target.size;
-        this.color = target.color;
-    }
-
-    @Override
-    public Tshirt copy() {
-        // More robust than super.clone() as it uses the copy constructor.
-        return new Tshirt(this);
-    }
-
-    // Setters for the 'tweaks'
-    public void setSize(String size) { this.size = size; }
-    public void setColor(String color) { this.color = color; }
-
-    public void display() {
-        System.out.println(String.format("[%s %s] Color: %s, Size: %s, Thread: %d", 
-            brand, type, color, size, threadCount));
+    Shape get(String key) {
+        return map.get(key).copy(); // return clone
     }
 }
+```
 
-// 4. Prototype Registry (The Master Storage)
-class TshirtRegistry {
-    private Map<String, Tshirt> registry = new HashMap<>();
-
-    public void register(String key, Tshirt prototype) {
-        registry.put(key, prototype);
-    }
-
-    public Tshirt get(String key) {
-        // Always returns a FRESH CLONE, not the original master object!
-        return registry.get(key).copy();
-    }
-}
-
-// 5. Execution Demo
-public class PrototypeDemo {
+✅ **4. Client Example**
+```java
+public class Main {
     public static void main(String[] args) {
-        // A. Setup Registry & Register Master Prototypes (Heavy work done once)
-        TshirtRegistry registry = new TshirtRegistry();
-        registry.register("T1", new Tshirt("Brand1", "ModelT1", 400));
-        registry.register("T2", new Tshirt("Brand1", "ModelT2", 600));
+        ShapeRegistry registry = new ShapeRegistry();
 
-        // B. Mass Produce by Cloning (Instantaneous)
-        System.out.println("\n--- Mass Producing Shirts ---");
-        Tshirt shirt1 = registry.get("T1");
-        shirt1.setSize("L");
-        shirt1.setColor("Black");
+        // Register prototype
+        registry.register("rect", new Rectangle(10, 5));
 
-        Tshirt shirt2 = registry.get("T1");
-        shirt2.setSize("S");
-        shirt2.setColor("White");
+        // Clone and modify
+        Rectangle r1 = (Rectangle) registry.get("rect");
+        r1.setWidth(20); // small change
 
-        shirt1.display();
-        shirt2.display();
+        Rectangle r2 = (Rectangle) registry.get("rect");
+
+        System.out.println(r1);
+        System.out.println(r2);
     }
 }
 ```
 
-#### 🌟 Key Advantages (Interviewer's Focus)
-1.  **Registry Pattern**: By using a `TshirtRegistry`, the client doesn't need to hold references to all master prototypes.
-2.  **Copy Constructor**: Using a private copy constructor for the `copy()` method is safer and clearer than Java's built-in `Cloneable`.
-3.  **Encapsulation**: The master "template" remains unchanged in the registry, while the client modifies individual clones.
+🎯 **Output**
+```text
+Rectangle: 20 x 5
+Rectangle: 10 x 5
+```
+
+⚡ **Viva Explanation (VERY IMPORTANT)**
+
+👉 **What is Prototype Pattern?**
+Instead of creating object from scratch, we copy (clone) an existing object.
+
+👉 **Why use it?**
+*   Faster than new object creation
+*   Avoid complex constructor logic
+
+👉 **Key Parts**
+*   **Interface** → `copy()`
+*   **Concrete class** → implements clone
+*   **Registry** → stores prototypes
+*   **Client** → asks registry for clone
+
+👉 **Important Point**
+*   `r1` changed → does NOT affect `r2` (because clone)
+
+🔥 **One-Line Memory Trick**
+👉 “Store one object → clone many → modify each”
+
+---
+
+
+---
+
+## 🎀 Structural Patterns: Decorator Pattern
+
+### 🧠 Decorator Pattern – Notification Example
+
+💡 **Idea**
+👉 “Add features dynamically (Email → Email+SMS → Email+SMS+WhatsApp)”
+
+✅ **1. Interface**
+```java
+interface Notifier {
+    void send(String msg);
+}
+```
+
+✅ **2. Base Class (Initial Email)**
+```java
+class EmailNotifier implements Notifier {
+    public void send(String msg) {
+        System.out.println("Sending Email: " + msg);
+    }
+}
+```
+
+✅ **3. Decorator Base Class**
+```java
+abstract class NotifierDecorator implements Notifier {
+    protected Notifier notifier;
+
+    NotifierDecorator(Notifier notifier) {
+        this.notifier = notifier;
+    }
+
+    public void send(String msg) {
+        notifier.send(msg);
+    }
+}
+```
+
+✅ **4. Concrete Decorators**
+
+📩 **SMS Decorator**
+```java
+class SMSDecorator extends NotifierDecorator {
+    SMSDecorator(Notifier notifier) {
+        super(notifier);
+    }
+
+    public void send(String msg) {
+        super.send(msg);
+        System.out.println("Sending SMS: " + msg);
+    }
+}
+```
+
+💬 **WhatsApp Decorator**
+```java
+class WhatsAppDecorator extends NotifierDecorator {
+    WhatsAppDecorator(Notifier notifier) {
+        super(notifier);
+    }
+
+    public void send(String msg) {
+        super.send(msg);
+        System.out.println("Sending WhatsApp: " + msg);
+    }
+}
+```
+
+✅ **5. Client Example**
+```java
+public class Main {
+    public static void main(String[] args) {
+        // Email + SMS + WhatsApp
+        Notifier n3 = new WhatsAppDecorator(
+                            new SMSDecorator(
+                                new EmailNotifier()));
+        n3.send("Hello");
+    }
+}
+```
+
+🎯 **Output**
+```text
+Sending Email: Hello
+Sending SMS: Hello
+Sending WhatsApp: Hello
+```
+
+⚡ **Viva Explanation (VERY IMPORTANT)**
+
+👉 **What is Decorator?**
+Add new behavior without changing original class.
+
+👉 **Flow**
+Email → wrapped by SMS → wrapped by WhatsApp.
+
+👉 **Key Benefit**
+*   Flexible combinations
+*   No class explosion
+
+👉 **Important Point**
+*   Each decorator wraps another object.
+
+🔥 **One-Line Memory Trick**
+👉 “Wrap object → add feature → chain multiple”
 
 ---
 
 ## 🛡️ Structural Patterns: Proxy Pattern
 
-The Proxy pattern acts as a **middleman** between the Client and the Real Object. It controls access, adds security, or handles expensive operations.
+### 🧠 Proxy Pattern – TextParser Example
 
-### 🌉 The Proxy Story: Resource Optimization (Before vs After)
-
-The Proxy pattern is most effective when managing **heavy resources** that might not always be used.
-
-#### 🏗️ The Setup: Interfaces & Heavy Object
+✅ **1. Interface**
 ```java
-interface ITextParser { int getWordCount(); }
-interface ITextProcessor { void f(); }
-
-class BookParser implements ITextParser {
-    public BookParser() {
-        // HEAVY CONSTRUCTOR: Network calls, Database parsing, etc.
-        System.out.println(">>> [CRITICAL] Running Heavy BookParser Initialization (2 Seconds)...");
-    }
-    public int getWordCount() { return 1000; }
-}
-
-class TextProcessor implements ITextProcessor {
-    private ITextParser tp;
-    public TextProcessor(ITextParser tp) { this.tp = tp; }
-    public void f() { tp.getWordCount(); }
+interface TextParser {
+    String parse(String text);
 }
 ```
 
----
-
-#### 🛑 Stage 1: Before (The Problem Scenario)
-In this scenario, we create the `BookParser` directly and inject it into the `TextProcessor`.
-
+✅ **2. Real Class (Heavy Work)**
 ```java
-interface ITextParser { int getWordCount(); }
-
-class BookParser implements ITextParser {
-    public BookParser() {
-        // HEAVY CONSTRUCTOR: Network calls, Database parsing, etc.
-        System.out.println(">>> [CRITICAL] Running Heavy BookParser Initialization (2 Seconds)...");
-    }
-    public int getWordCount() { return 1000; }
-}
-
-class TextProcessor {
-    private ITextParser tp;
-    public TextProcessor(ITextParser tp) { this.tp = tp; }
-    public void f() { tp.getWordCount(); }
-}
-
-public class ProxyBeforeDemo {
-    public static void main(String[] args) {
-        // PROBLEM: The BookParser is created HERE, even if its methods are never called.
-        System.out.println("Initializing TextProcessor...");
-        TextProcessor processor = new TextProcessor(new BookParser());
-        
-        System.out.println("TextProcessor ready.");
-        // If we never call processor.f(), the 2-second heavy initialization was a waste!
+class RealTextParser implements TextParser {
+    public String parse(String text) {
+        System.out.println("Parsing text...");
+        return text.toUpperCase(); // heavy processing (example)
     }
 }
 ```
 
-**The Issues**:
-1.  **Wasteful Creation**: The `BookParser` object is created when the `Client` is instantiated, regardless of whether `clientMethod1` or `clientMethod2` are ever called.
-2.  **Resource Drain**: Even if the conditions are always `false`, the heavy constructor has already executed, wasting RAM and CPU.
-
----
-
-#### ✨ Stage 2: After (The Proxy Solution)
-We introduce a **Proxy** to defer the heavy creation until it's actually needed.
-
+✅ **3. Proxy Class (Controls Access)**
 ```java
-// THE PROXY: Implements same interface, but holds a reference to the real object
-class BookParserProxy implements ITextParser {
-    private BookParser realParser; // Delayed creation
+class ProxyTextParser implements TextParser {
+    private RealTextParser realParser;
 
-    public int getWordCount() {
+    public String parse(String text) {
+        // Access control (example: block empty text)
+        if (text == null || text.isEmpty()) {
+            return "Invalid input!";
+        }
+
+        // Lazy initialization
         if (realParser == null) {
-            // DEFERRED: Actual creation happens only on FIRST call
-            realParser = new BookParser();
+            realParser = new RealTextParser();
         }
-        return realParser.getWordCount();
-    }
-}
 
-public class ProxyAfterDemo {
-    public static void main(String[] args) {
-        System.out.println("Initializing TextProcessor with Proxy...");
-        // SOLUTION: The Proxy is created instantly (zero cost)
-        TextProcessor processor = new TextProcessor(new BookParserProxy());
-        
-        System.out.println("TextProcessor ready. (Notice: No heavy loading yet!)");
-        
-        System.out.println("\nExecuting f() for the first time:");
-        processor.f(); // Heavy loading happens only now!
+        return realParser.parse(text);
     }
 }
 ```
 
-**The Benefits**:
-1.  **Lazy Loading**: The heavy object is created **only if** one of the conditional calls actually occurs.
-2.  **Zero Client Changes**: The `Client` still works with `ITextProcessor`, unaware a Proxy middleman is saving resources.
-3.  **Encapsulation**: The logic for checking "is the object created?" is hidden inside the Proxy.
-
----
-
-#### ✨ Stage 3: Direct Proxy Injection (Optimized After Situation)
-
-In this final optimization, we modify the `TextProcessor` to specifically accept the `BookParserProxy`. This guarantees that the heavy creation is deferred until the first actual use inside the processor, while maintaining a clean, injection-based design.
-
-**The Strategy**:
-1. `TextProcessor` now specifically accepts a `BookParserProxy` in its constructor.
-2. The `Client` creates the proxy and injects it.
-3. The heavy `BookParser` is created **only** when `getWordCount()` is called inside `TextProcessor.f()`.
-
-#### 💻 Complete Runnable Code
+✅ **4. Client Example**
 ```java
-// 1. Original ITextParser interface
-interface ITextParser {
-    int getWordCount();
-}
-
-// 2. Concrete implementation (Heavy)
-class BookParser implements ITextParser {
-    public BookParser() {
-        System.out.println(">>> [CRITICAL] Running Heavy BookParser Initialization (2 Seconds)...");
-    }
-
-    public int getWordCount() {
-        return 1000;
-    }
-}
-
-// 3. Proxy class (Middleman)
-class BookParserProxy implements ITextParser {
-    private BookParser realParser;
-
-    public int getWordCount() {
-        if (realParser == null) {
-            // Lazy loading happens here
-            realParser = new BookParser();
-        }
-        return realParser.getWordCount();
-    }
-}
-
-// 4. Modified TextProcessor (Accepts Proxy directly)
-class TextProcessorOptimized {
-    private BookParserProxy parserProxy;
-
-    public TextProcessorOptimized(BookParserProxy parserProxy) {
-        this.parserProxy = parserProxy;
-    }
-
-    public void f() {
-        // This will only trigger the real creation when getWordCount is called
-        System.out.println("Executing f()...");
-        int count = parserProxy.getWordCount();
-        System.out.println("Word Count: " + count);
-    }
-}
-
-// 5. Usage Demo
-public class ProxyOptimizationDemo {
+public class Main {
     public static void main(String[] args) {
-        System.out.println("--- Scenario: Client creates TextProcessor ---");
-        // Inject the proxy instantly (zero cost)
-        TextProcessorOptimized tp = new TextProcessorOptimized(new BookParserProxy());
-        
-        System.out.println("TextProcessor ready. (Notice: No heavy object created yet)");
+        TextParser parser = new ProxyTextParser();
 
-        // Assume some conditional logic here
-        boolean someCondition = true; 
-        if (someCondition) {
-            System.out.println("\nCondition met! Calling f()...");
-            tp.f(); // Heavy object created ONLY now
-        }
+        System.out.println(parser.parse("hello world"));
+        System.out.println(parser.parse("")); // blocked by proxy
     }
 }
 ```
 
-**Why this matters**:
-- **Guaranteed Lazy Loading**: By using the Proxy in the constructor, we explicitly signal that we want deferred initialization.
-- **Structural Integrity**: It keeps the proxy logic (the "middleman" checks) separate from the core `TextProcessor` logic.
-- **Adherence to Principles**: We are still using Dependency Injection, but with an added layer of resource management that prevents wasteful creation if `f()` is never called.
-
----
-
-### 1. Remote Proxy: Retry Logic (GeoLocator Story)
-A proxy can check permissions, add logs, or handle retries before calling a real (possibly unreliable) API.
-
-```java
-interface GeoService { void locate(); }
-
-class GeoLocate implements GeoService {
-    public void locate() { 
-        System.out.println("Calling Government Map API...");
-        // Might throw timeout simulation
-        throw new RuntimeException("Timeout!");
-    }
-}
-
-class GeoProxy implements GeoService {
-    private GeoLocate realService = new GeoLocate();
-
-    public void locate() {
-        System.out.println("LOG: Checking client permissions and initializing retry logic...");
-        int attempts = 0;
-        while (attempts < 3) {
-            try {
-                realService.locate();
-                return;
-            } catch (Exception e) {
-                attempts++;
-                System.out.println("Attempt " + attempts + " failed. Retrying...");
-            }
-        }
-        System.out.println("All retry attempts failed.");
-    }
-}
-
-public class GeoProxyDemo {
-    public static void main(String[] args) {
-        GeoService service = new GeoProxy();
-        service.locate();
-    }
-}
+🎯 **Output**
+```text
+Parsing text...
+HELLO WORLD
+Invalid input!
 ```
 
-### 2. Access Control & Lazy Loading Proxy (WordDoc Story)
+⚡ **Viva Explanation (IMPORTANT)**
 
-In this refined scenario, we combine **Access Control** (Security) and **Lazy Loading** (Resource Optimization). The `WordDocProxy` ensures that the heavy `WordDoc` is only created if authorized and actually needed.
+👉 **What happens here?**
+*   Client talks to Proxy
+*   Proxy checks input (control)
+*   Then calls `RealTextParser`
 
-**The Strategy**:
-1. `DocumentProcessor` specifically accepts a `WordDocProxy`.
-2. The `Proxy` manages different access rights for **Employee**, **Student**, and **Mentor**.
-3. The `WordDoc` itself is only created upon the first successful authorized call.
+👉 **Why Proxy here?**
+*   Validate input
+*   Avoid unnecessary object creation
+*   Add control before real logic
 
-#### 💻 Complete Runnable Code
-```java
-// 1. User Role Definitions
-class User {}
-class Employee extends User {}
-class Student extends User {}
-class Mentor extends User {}
+🔥 **One-Line Memory Trick**
+👉 “Proxy checks → then forwards to real object”
 
-class AccessDeniedException extends RuntimeException {
-    public AccessDeniedException(String message) { super(message); }
-}
-
-// 2. Document interface
-interface IDocument {
-    void read(User user);
-    void write(User user);
-    void rename(User user);
-}
-
-// 3. Concrete Implementation (Heavy)
-class WordDoc implements IDocument {
-    public WordDoc() {
-        System.out.println(">>> [HEAVY] Initializing Real WordDoc object...");
-    }
-    public void read(User user) { System.out.println("Reading Word document"); }
-    public void write(User user) { System.out.println("Writing to Word document"); }
-    public void rename(User user) { System.out.println("Renaming Word document"); }
-}
-
-// 4. WordDoc Proxy (Security + Lazy Loading)
-class WordDocProxy implements IDocument {
-    private WordDoc realDoc;
-
-    public void read(User user) {
-        // Everyone can read
-        getRealDoc().read(user);
-    }
-
-    public void write(User user) {
-        if (user instanceof Employee || user instanceof Student) {
-            getRealDoc().write(user);
-        } else {
-            throw new AccessDeniedException("Write access denied");
-        }
-    }
-
-    public void rename(User user) {
-        if (user instanceof Employee || user instanceof Student) {
-            getRealDoc().rename(user);
-        } else {
-            throw new AccessDeniedException("Rename access denied");
-        }
-    }
-
-    private WordDoc getRealDoc() {
-        if (realDoc == null) {
-            // Lazy loading happens here
-            realDoc = new WordDoc();
-        }
-        return realDoc;
-    }
-}
-
-// 5. Document Processor (Accepts Proxy Directly)
-class DocumentProcessor {
-    private WordDocProxy docProxy;
-
-    public DocumentProcessor(WordDocProxy docProxy) {
-        this.docProxy = docProxy;
-    }
-
-    public void processDocument(User user) {
-        try {
-            System.out.println("Processing for: " + user.getClass().getSimpleName());
-            docProxy.read(user);
-            docProxy.write(user);
-            docProxy.rename(user);
-        } catch (AccessDeniedException e) {
-            System.out.println(">>> Access Error: " + e.getMessage());
-        }
-    }
-}
-
-// 6. Usage Demo
-public class WordProxyDemo {
-    public static void main(String[] args) {
-        DocumentProcessor processor = new DocumentProcessor(new WordDocProxy());
-
-        System.out.println("--- Scenario: Employee ---");
-        processor.processDocument(new Employee()); // Full Success
-
-        System.out.println("\n--- Scenario: Mentor ---");
-        processor.processDocument(new Mentor());   // Denied for Write/Rename
-    }
-}
-```
-
-**Key Improvements**:
-- **Consolidated Logic**: The proxy now enforces roles *and* prevents unnecessary memory allocation.
-- **Architectural Clarity**: By injecting the proxy, we stay within the Dependency Injection paradigm while explicitly utilizing the Proxy’s specialized behaviors.
-- **Scalability**: New document types or user roles can be added by updating the Proxy, without ever touching the core `WordDoc` logic (preserving the Open/Closed Principle).
-
----
-
-### 3. Lazy Loading Proxy (BookParser Story)
-If an object is very heavy (e.g., parsing a 1000-page book), the Proxy waits until the client *actually* asks for data before creating the real object.
-
-```java
-class BookParserProxy implements ITextParser {
-    private BookParser realParser; // Only created if needed
-
-    public int getWordCount() {
-        if (realParser == null) {
-            realParser = new BookParser(); // Deferred creation
-        }
-        return realParser.getWordCount();
-    }
-}
-```
-
----
-
-### 🌌 The Versatility of the Proxy Pattern
-
-As discussed in the session (around 1:20:00), the Proxy pattern is highly versatile and solves multiple architectural problems by acting as a specialized middleman.
-
-| Proxy Type | Purpose | Goal |
-| :--- | :--- | :--- |
-| **Virtual Proxy** | Lazy Initialization | Delays creation of expensive objects until strictly needed (e.g., `BookParser`). |
-| **Protection Proxy** | Access Control | Checks permissions/rights before allowed access (e.g., `WordDocWrapper`). |
-| **Remote Proxy** | Remote Resource Access | Bridges communication with objects in different address spaces or machines (e.g., `GeoLocator`). |
-| **Smart Proxy** | Logging & Caching | Adds functionality like tracking usage or caching results without modifying the real object. |
-| **Reliability Proxy** | Error Handling | Implements retry logic and timeout management for unreliable services (e.g., `GeoProxy`). |
-
-**Key Takeaway**: The Proxy pattern allows us to **add behavior without modifying existing code**, perfectly adhering to the **Open/Closed Principle**. It is your "Swiss Army Knife" for controlling access and managing resources.
 
 ---
 
 ## 🪶 Structural Patterns: Flyweight Pattern
 
-### 🛑 The Memory Problem (The Game Story)
-Imagine you are building a game like **BGMI**, **COD**, or **FIFA**.
-1.  **The Interaction**: Your character needs to navigate a world filled with millions of objects—stones, trees, houses, and bullets.
-2.  **The Attributes**: Every single stone object has coordinates (`x, y`), `speed`, and a high-resolution `image`.
-3.  **The Cost**: A single stone object takes about **20-21 KB** of memory (most of which is the 19KB image data).
+### 🧠 Flyweight Pattern – Bullet Example
 
-#### 💥 The "Billion Stone" Crash
-Imagine there are **1,000,000,000 (1 Billion)** stones on the map.
--   **Math**: 21 KB $\times$ 1,000,000,000 $\approx$ **20 TB of RAM!** 
--   **Result**: Even with a 1,000,000 stone scenario, you'd need **20 GB RAM** just for stones. The game would instantly crash on almost any consumer device.
+💡 **Idea**
+👉 “BulletType = shared (heavy), Bullet = unique (position)”
 
-### 🧩 The Solution: The "Replica" Insight
-As the instructor observed, despite the apparent variety in massive games, most objects are actually **Replicas**.
--   **FIFA**: There are thousands of spectators in the audience. They aren't 50,000 unique humans; they are a dozen unique models repeated thousands of times.
--   **FPS Games**: 10,000 trees on a mountain are usually just **10-20 unique tree models** repositioned and rotated.
-
-### 🧩 Sharing State: Intrinsic vs Extrinsic
-To make this work, we split the object’s data into two categories:
-
-1.  **Intrinsic State (Shared)**: Fixed data that is the same for all objects of a type.
-    -   *Example*: The high-res Image data of a stone.
-2.  **Extrinsic State (Unique)**: Dynamic attributes that change for every single instance.
-    -   *Example*: The `x, y` position, `rotation`, or `speed`.
-
-**The Goal**: Create separate classes for shared data and object instances, using references to shared data rather than duplicating it.
-
-#### 🪶 Efficiency Implementation
+✅ **1. Flyweight Class (Shared Object)**
 ```java
-import java.util.HashMap;
-import java.util.Map;
+class BulletType {
+    String color;
+    String image; // heavy data
 
-// 1. Shared State (Intrinsic / Flyweight)
-// This object is heavy, but we only create it ONCE per type.
-class StoneImage {
-    private String data = "19KB_OF_IMAGE_DATA"; // Large object
-    private String name;
-
-    public StoneImage(String name) { this.name = name; }
-    public String getName() { return name; }
-}
-
-// 2. Flyweight Factory
-// Manages the shared pool of replicas.
-class StoneFactory {
-    private static Map<String, StoneImage> cache = new HashMap<>();
-
-    public static StoneImage getImage(String name) {
-        if (!cache.containsKey(name)) {
-            System.out.println(">>> [LOG] Loading Image from Disk: " + name);
-            cache.put(name, new StoneImage(name));
-        }
-        return cache.get(name);
+    public BulletType(String color, String image) {
+        this.color = color;
+        this.image = image;
+        System.out.println("Creating BulletType: " + color);
     }
-}
 
-// 3. Object with Shared Data (Extrinsic State)
-class Stone {
-    int x, y;             // Extrinsic (Unique position)
-    int speed;            // Extrinsic (Unique speed)
-    StoneImage image;     // Intrinsic (Shared Reference)
-
-    public Stone(int x, int y, int speed, StoneImage img) {
-        this.x = x;
-        this.y = y;
-        this.speed = speed;
-        this.image = img;
-    }
-}
-
-public class FlyweightDemo {
-    public static void main(String[] args) {
-        System.out.println("--- Scenario: Rendering 1,000,000 Stones ---");
-        
-        // We only load the image ONCE
-        StoneImage sharedImg = StoneFactory.getImage("SharpStone");
-
-        // We can now create millions of stones with almost zero memory footprint
-        Stone s1 = new Stone(10, 20, 5, sharedImg);
-        Stone s2 = new Stone(100, 200, 2, sharedImg);
-
-        System.out.println("\nVerifying Memory Sharing:");
-        System.out.println("Stone 1 Image ID: " + s1.image.hashCode());
-        System.out.println("Stone 2 Image ID: " + s2.image.hashCode());
-        System.out.println("Are they sharing the 19KB image? " + (s1.image == s2.image));
-        
-        System.out.println("\nMemory Saved: (Millions of objects * 19KB) - 19KB");
+    public void display(int x, int y) {
+        System.out.println("Bullet " + color + " at (" + x + "," + y + ")");
     }
 }
 ```
+
+✅ **2. Bullet (Context – Unique Data)**
+```java
+class Bullet {
+    int x, y; // extrinsic data
+    BulletType type; // shared
+
+    public Bullet(int x, int y, BulletType type) {
+        this.x = x;
+        this.y = y;
+        this.type = type;
+    }
+
+    public void draw() {
+        type.display(x, y);
+    }
+}
+```
+
+✅ **3. Flyweight Factory**
+```java
+import java.util.*;
+
+class BulletFactory {
+    private static Map<String, BulletType> map = new HashMap<>();
+
+    public static BulletType getBulletType(String color) {
+        if (!map.containsKey(color)) {
+            map.put(color, new BulletType(color, "bullet.png"));
+        }
+        return map.get(color); // reuse
+    }
+}
+```
+
+✅ **4. Client Example**
+```java
+public class Main {
+    public static void main(String[] args) {
+        Bullet b1 = new Bullet(10, 20, BulletFactory.getBulletType("red"));
+        Bullet b2 = new Bullet(30, 40, BulletFactory.getBulletType("red"));
+        Bullet b3 = new Bullet(50, 60, BulletFactory.getBulletType("blue"));
+
+        b1.draw();
+        b2.draw();
+        b3.draw();
+    }
+}
+```
+
+🎯 **Output**
+```text
+Creating BulletType: red
+Creating BulletType: blue
+Bullet red at (10,20)
+Bullet red at (30,40)
+Bullet blue at (50,60)
+```
+
+⚡ **Viva Explanation (VERY IMPORTANT)**
+
+👉 **What is shared?**
+*   `BulletType` (color, image) → heavy → reused
+
+👉 **What is unique?**
+*   `x, y` → position
+
+👉 **Factory Role**
+*   Creates object only once
+*   Returns same object again
+
+👉 **Key Point**
+*   100 bullets → maybe only 2 `BulletType` objects.
+
+🔥 **One-Line Memory Trick**
+👉 “Same bullet type → different positions → reuse”
+
 
 ---
 
@@ -616,9 +404,11 @@ public class FlyweightDemo {
 
 | Pattern | Type | Real-World Story | Core Benefit |
 | :--- | :--- | :--- | :--- |
-| **Prototype** | Creational | T-Shirt Cloning | Fast object creation from heavy masters |
-| **Proxy** | Structural | Access Card/Middleman | Security, Lazy Loading, Remote Access |
-| **Flyweight** | Structural | Game Assets (Stones/Trees) | Massive memory savings via sharing |
+| **Prototype** | Creational | Rectangle Cloning | Fast creation from masters |
+| **Decorator** | Structural | Notification Layers | Dynamic behavior additions |
+| **Proxy** | Structural | Access Middleman | Control, Lazy Loading, Validation |
+| **Flyweight** | Structural | Game Bullets | Massive memory savings via sharing |
+
 
 ---
 

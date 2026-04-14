@@ -29,6 +29,9 @@ In `Main.java`, we refactored the HR Management System to adhere to SOLID princi
 
 The goal of a Singleton is to ensure that a class has only **one instance** and provides a global point of access to it.
 
+**Intent:** Ensure exactly one instance of a class exists and provide a global access point.
+**Use cases:** Logging service, configuration manager, feature flag provider, connection pool manager, metrics reporter.
+
 ### Step 0: Eager Initialization (The Initial Approach)
 The instance is created at the time of class loading.
 
@@ -284,22 +287,51 @@ The JVM can reorder these to **1 -> 2 -> 3**. If **T1** links the reference (Ste
 While DCL is the classic answer, modern Java offers cleaner alternatives.
 
 ### 1. Enum Singleton (The Most Robust)
-Recommended by Joshua Bloch (Effective Java), this is the simplest and most secure way.
 
+Recommended by Joshua Bloch (Effective Java), this is widely considered the **most secure and simplest** way to implement a Singleton in Java.
+
+#### 💻 Refactored Implementation
 ```java
-public enum FileStorageService {
-    INSTANCE;
-    
-    public void log(String msg) {
-        System.out.println("Logging: " + msg);
+public enum ConnectionPool {
+    INSTANCE; // This is the single instance
+
+    private String databaseUrl;
+
+    // Enum constructors are private by default
+    ConnectionPool() {
+        this.databaseUrl = "jdbc:mysql://localhost:3306/mydb";
+    }
+
+    public void getConnection() {
+        System.out.println("Connecting to: " + databaseUrl);
     }
 }
+
+// Usage:
+// ConnectionPool.INSTANCE.getConnection();
 ```
-- **Why it's great**: 
-    - Inherently thread-safe by the JVM.
-    - Protected against Reflection attacks.
-    - Handles Serialization automatically.
-- **Interview Tip**: "It's the only approach that provides a concrete guarantee against multiple instantiation, even in complex scenarios like serialization."
+
+---
+
+#### 🛡️ Why it works best
+1.  **Absolute Thread Safety**: The JVM guarantees that enum constants are instantiated only once in a thread-safe manner during class loading. You don't need `synchronized` or `volatile`.
+2.  **Native Serialization Support**: Unlike normal classes, enums handle serialization automatically. The JVM ensures that during deserialization, the same `INSTANCE` is returned, preventing the creation of "duplicate" singletons. No need for `readResolve()`.
+3.  **Reflection Proof**: This is the only method that is **immune to Reflection attacks**. If you try to instantiate an enum via Reflection, the JVM throws an `IllegalArgumentException`, specifically stating that enums cannot be reflectively created.
+
+---
+
+#### ❌ Why other approaches can "break"
+*   **Lazy Initialization (V1)**: Fails in multi-threaded environments (Race Condition).
+*   **Synchronized Method (V2)**: Extremely slow due to locking overhead.
+*   **Double-Checked Locking (V3)**: Requires `volatile` to prevent "half-baked" objects due to instruction reordering. Even then, it is **vulnerable to Reflection and Serialization** unless you manually add guards and `readResolve()`.
+
+---
+
+#### ⚠️ Setbacks of Enum Singleton
+While robust, the Enum Singleton has a few limitations:
+1.  **No Lazy Loading**: Like Eager initialization, the enum instance is created as soon as the class is loaded. If the object is very "heavy" and rarely used, this might waste memory.
+2.  **No Inheritance**: Enums in Java cannot extend another class (because they implicitly extend `java.lang.Enum`). If your Singleton needs to be part of a class hierarchy, you cannot use this approach.
+3.  **Limited Flexibility**: It's harder to refactor an Enum Singleton into a "Multiton" (e.g., exactly 3 instances) or change it to a non-singleton later compared to the Builder or Factory patterns.
 
 ### 2. Bill Pugh Singleton (Static Inner Class)
 Uses the "Lazy Initialization Holder" idiom. It's lazy and thread-safe without explicit synchronization!
@@ -321,9 +353,66 @@ public class FileStorageService {
 
 ---
 
+### 3. Testing Singletons (The Hidden Cost)
+- **Problem**: Singletons are difficult to mock in unit tests because they provide a global state.
+- **Solution**: If testability is a high priority, consider using Dependency Injection (like Spring) to manage singletons rather than hardcoding the Singleton pattern yourself.
+
+---
+
+### 🎙️ Singleton Interview Questions
+
+#### Q1: How do you make a class Singleton?
+- By making the constructor `private` to restrict external instantiation.
+- Holding a `static` reference to the single instance within the class.
+- Providing a `public static` method (like `getInstance()`) to allow global access to that instance.
+
+#### Q2: What problem does eager initialization cause?
+- Eager initialization creates the instance at the time of class loading, even if the application never uses it. This can consume unnecessary memory and slow down system startup if the object is resource-heavy.
+
+#### Q3: How does lazy initialization solve this, and what problem does it introduce?
+- **Solution**: It creates the instance only when `getInstance()` is called for the first time, saving memory.
+- **Problem**: It introduces a **Race Condition** in a multi-threaded environment. Two threads could simultaneously check `instance == null` and end up creating two separate objects.
+
+#### Q4: What is Double-Checked Locking (DCL)? How do you achieve it?
+- DCL is an optimization to reduce the overhead of a fully synchronized block. It checks if the instance is null (first check, no lock). If true, it enters a `synchronized` block and checks if the instance is null again (second check, with lock) before creating the object.
+- **How to achieve it**:
+  ```java
+  if (instance == null) {
+      synchronized (Logger.class) {
+          if (instance == null) {
+              instance = new Logger();
+          }
+      }
+  }
+  ```
+
+#### Q5: What two problems arise without `volatile` in Double-Checked Locking?
+1. **Instruction Reordering**: Object creation is not atomic (allocate memory, initialize, assign reference). The JVM might assign the reference before initialization is complete. Another thread could then see a non-null, but fully "half-baked" object.
+2. **Caching and Visibility**: Without `volatile`, one thread might update its CPU cache with the new object reference, but other threads might still see `null` in their own caches.
+
+#### Q6: Which Singleton approach is the safest overall, and why?
+- **Enum Singleton** is the safest.
+- **Why**: It relies on the JVM to automatically handle thread safety, serialization, and absolute protection against Java Reflection API attacks (which can break private constructors in other approaches).
+
+---
+
 ## 🔒 Immutability in Java
 
 An **Immutable Class** is one whose state cannot be changed after it is constructed. Applications like `String` and `Integer` are immutable by design.
+
+**Intent:** Objects whose state cannot change after construction.
+**Use cases:** Payment receipts, order snapshots, currency/money values, configuration objects, DTOs shared across threads.
+
+---
+
+### ❓ Why do we need Immutability?
+1. **Thread Safety**: Immutable objects are inherently thread-safe. Multiple threads can access them simultaneously without any risk of data corruption or race conditions, as their state never changes. No `synchronized` blocks or locks are needed.
+2. **Security**: Sensitive information (like usernames, passwords, or network configurations) is often stored in immutable objects. If `String` were mutable, an attacker could potentially change the connection string *after* it's been validated but *before* it's used.
+3. **Caching & Reusability**: Because they never change, they are perfect for caching. This is why Java has a **String Pool** and caches small `Integer` values (-128 to 127).
+4. **Consistency in Hash-based Collections**: If an object is used as a key in a `HashMap` or `HashSet`, its `hashCode` must remain constant. If the object were mutable and its state changed, its hash code would change, making it impossible to retrieve the object from the collection.
+5. **Predictability**: It's much easier to reason about code when you know that an object passed into a method won't be silently modified by that method.
+
+---
 
 ### 📜 The 5 Rules of Immutability
 1. **No Setters**: Don't provide methods that modify the object's state.
@@ -344,190 +433,311 @@ If you simply assign `this.list = list;`, both your object and the caller (e.g.,
 If your getter returns `return this.list;`, you are handing over the keys to your internal data. The caller can now call `.add()` or `.clear()` on your private list.
 - **Solution**: Return a `new ArrayList<>(this.list)`. The user will modify their own copy, not your internal reference.
 
-#### 💻 Comprehensive Example
+#### 💻 Simple Scalar Example (`PaymentReceipt`)
+If all fields are primitive or themselves immutable, simple assignment via constructor is enough.
 ```java
-public final class ImmutableDemo {
-    private final int a;
-    private final ArrayList<Integer> list;
+import java.time.Instant;
 
-    public ImmutableDemo(int a, ArrayList<Integer> list) {
-        this.a = a;
-        // DEEP COPY in Constructor: 
-        // Prevents main() from changing our list after passing it
-        this.list = new ArrayList<>(list); 
+public final class PaymentReceipt {
+    private final String id;
+    private final double amount;
+    private final Instant timestamp;
+
+    public PaymentReceipt(String id, double amount, Instant timestamp) {
+        if (id == null || id.isBlank()) throw new IllegalArgumentException("id required");
+        this.id = id;
+        this.amount = amount;
+        this.timestamp = timestamp;
     }
 
-    public ArrayList<Integer> getList() {
-        // DEEP COPY in Getter: 
-        // User modifies the deep copy, not our internal list
-        return new ArrayList<>(this.list);
+    public String getId() { return id; }
+    public double getAmount() { return amount; }
+    public Instant getTimestamp() { return timestamp; }
+}
+```
+
+#### 🛡️ Defensive Copying Example (`Order`)
+If you have a mutable collection, you must make defensive copies to prevent external mutation of internal state.
+
+```java
+import java.util.*;
+
+public final class Order {
+    private final List<String> items;
+    
+    public Order(List<String> items) {
+        // Creates an unmodifiable copy at the time of construction
+        this.items = List.copyOf(items); 
+    }
+
+    public List<String> getItems() {
+        // Returns a safe view so caller cannot call .add()
+        return Collections.unmodifiableList(items); 
     }
 }
+```
+*Note: If we just did `this.items = items;`, a caller could modify their original list and silently alter the `Order` object!*
 
-public class Main {
-    public static void main(String[] args) {
-        ArrayList<Integer> list = new ArrayList<>();
-        ImmutableDemo obj = new ImmutableDemo(10, list);
+#### 🎮 Complete Real-World Example (`GameConfig`)
+Combining standard types and collections securely:
 
-        // This modification only affects the copy returned by getList()
-        obj.getList().add(10);
-        obj.getList().add(90);
+```java
+import java.util.*;
 
-        // The internal list remains EMPTY!
-        System.out.println("Object List Size: " + obj.getList().size()); // Prints 0
+public final class GameConfig {
+    private final String name;
+    private final List<String> rules;
+
+    public GameConfig(String name, List<String> rules) {
+        this.name = Objects.requireNonNull(name);
+        this.rules = List.copyOf(rules); // defensive copy
     }
+
+    public String getName() { return name; }
+    public List<String> getRules() { return Collections.unmodifiableList(rules); }
+
+    @Override
+    public String toString() { return name + " with rules " + rules; }
 }
 ```
 
 ---
 
-## 🏗️ Builder Design Pattern: An Evolutionary Story
-->providing flexibility when it comes to object creation of Immutable classes
+### 👥 How to "Clone" an Immutable Object?
 
-The Builder pattern is used to construct complex objects. Instead of one giant constructor, we use a separate "workspace" to collect data. The design evolved through three distinct stages to reach the standard "Static Inner Class" pattern we use today.
+In standard Java, cloning is done using the `clone()` method. However, for an **Immutable Class**, traditional cloning is redundant.
 
----
-
-### Stage 1: Separate Classes (`MasterClass` & `X`)
-Initially, we might create two separate classes: one for the final object (`MasterClass`) and one for the configuration (`X`).
-
-```java
-// Logic: MasterClass is immutable
-class MasterClass {
-    private final int a;
-    private final int b;
-    private final String c;
-
-    public MasterClass(X config) {
-        this.a = config.a;
-        this.b = config.b;
-        this.c = config.c;
+1. **Returning `this`**: Since the object's state can never change, any number of references can safely point to the same instance. Therefore, a `clone()` implementation for an immutable class should simply **return `this`**.
+    ```java
+    @Override
+    protected Object clone() throws CloneNotSupportedException {
+        // No need to create a new object. 'this' is perfectly safe to share.
+        return this;
     }
+    ```
+2. **The "Wither" Pattern (Functional Cloning)**: If you need a copy of the object but with one field modified (e.g., changing a user's email), you use what's called a **"Wither" method**. It returns a **new instance** with the updated value while copying everything else.
+    ```java
+    public final class User {
+        private final String name;
+        private final String email;
 
-    public void display() { System.out.println(a + " " + b + " " + c); }
-}
+        public User(String name, String email) {
+            this.name = name;
+            this.email = email;
+        }
 
-// X is a separate mutable helper class
-class X {
-    public int a;
-    public int b;
-    public String c;
-}
-
-public class Main {
-    public static void main(String[] args) {
-        X config = new X();
-        config.a = 10;
-        config.b = 20;
-        config.c = "Stage 1";
-
-        MasterClass obj = new MasterClass(config);
-        obj.display();
-    }
-}
-```
-- **The Problem**: 
-    - **Reduced Abstraction**: The client has to know about and manage two completely separate classes.
-    - **Maintainability**: If you add a variable to `MasterClass`, you must manually remember to add it to `X`. They are disconnected.
-
----
-
-### Stage 2: Non-Static Inner Class
-To improve maintainability, we move `X` inside `MasterClass`. This keeps the code together.
-
-```java
-class MasterClass {
-    private int a;
-    // ... other fields
-
-    public MasterClass(X config) {
-        this.a = config.a;
-    }
-
-    // Non-static inner class
-    class X {
-        public int a;
-        public X setA(int a) { this.a = a; return this; }
-    }
-}
-
-public class Main {
-    public static void main(String[] args) {
-        // ERROR: To create X, you need an instance of MasterClass!
-        // X helper = new MasterClass.X(); 
-        
-        // But to create MasterClass, you need an instance of X!
-        // MasterClass obj = new MasterClass(helper);
-    }
-}
-```
-- **The Problem**: **Circular Dependency Paradox**. Since `X` is a non-static inner class, it belongs to an *instance* of `MasterClass`. You can't create the helper without the object, but you can't create the object without the helper.
-
----
-
-### Stage 3: The Standard Builder (Static Inner Class)
-By making `X` (now called `Builder`) a **static inner class**, it no longer belongs to an instance. It belongs to the class itself.
-
-```java
-public class MasterClass {
-    private final int a;
-    private final int b;
-    private final String c;
-
-    private MasterClass(Builder builder) {
-        this.a = builder.a;
-        this.b = builder.b;
-        this.c = builder.c;
-    }
-
-    // Static Inner Class: The perfect workspace
-    public static class Builder {
-        private int a;
-        private int b;
-        private String c;
-
-        public Builder setA(int a) { this.a = a; return this; }
-        public Builder setB(int b) { this.b = b; return this; }
-        public Builder setC(String c) { this.c = c; return this; }
-
-        public MasterClass build() {
-            return new MasterClass(this);
+        // Instead of setName(), we have withEmail()
+        public User withEmail(String newEmail) {
+            return new User(this.name, newEmail);
         }
     }
+    ```
 
-    public void display() { System.out.println(a + " " + b + " " + c); }
-}
+---
 
-public class Main {
-    public static void main(String[] args) {
-        // --- Approach 1: Verbose (The 3-Step Way) ---
-        // 1. Create the builder object
-        MasterClass.Builder helper = new MasterClass.Builder();
-        // 2. Set values
-        helper.setA(100);
-        helper.setB(200);
-        helper.setC("Verbose");
-        // 3. Pass to constructor (or call build)
-        MasterClass obj1 = helper.build();
+### 🎙️ Interview Follow-up / Practice Questions
 
-        // --- Approach 2: Concise (The Improved Way) ---
-        // Using method chaining and the F() method (build)
-        MasterClass obj2 = new MasterClass.Builder()
-                            .setA(100)
-                            .setB(200)
-                            .setC("Concise")
-                            .build(); // Instructor referred to this as F()
-        
-        obj1.display();
-        obj2.display();
+#### Q1: Why should immutable classes make defensive copies of mutable fields?
+- If an immutable class holds a reference to a mutable object (like a `List`), external code could modify that object and silently alter the "immutable" state. Defensive copying ensures the object owns completely isolated data. 
+
+#### Q2: What is the difference between returning a defensive copy and an unmodifiable view?
+- **Defensive Copy (`new ArrayList<>(list)`)**: Creates a completely new list containing the same elements. It takes more memory but is completely detached.
+- **Unmodifiable View (`Collections.unmodifiableList(list)`)**: Doesn't create a new list; it creates a "read-only" wrapper around the existing list. It's more memory efficient but relies on the underlying list not changing.
+
+#### Q3: How does immutability improve thread-safety?
+- Because the state of an immutable object never changes after construction, multiple threads can read it simultaneously without any risk of Race Conditions or data corruption. **No synchronization or locks are required**.
+
+#### Q4: Why is marking the class `final` recommended when creating an immutable class?
+- It prevents **Inheritance Risks**. A subclass could override methods to return different values, add setters, or expose mutable state, completely breaking the immutability guarantee.
+
+#### Q5: Give two real-world use cases where immutability is essential.
+1. **Security/Authentication**: Passing around a `UserCredentials` object. You don't want another part of the system unexpectedly changing the username after it's been validated.
+2. **High-Concurrency Systems**: Sharing Configuration objects (like `GameConfig`) or DTOs across hundreds of threads without locking bottlenecks.
+
+#### Q6: Why is `String` immutable in Java?
+- **String Pool**: To save memory by sharing common strings.
+- **Security**: To prevent modification of credentials/paths after validation.
+- **Hashing**: `String` caches its hash code because its value never changes, making it extremely fast and reliable as a key in `HashMap`.
+
+#### Q7: If a class has a `final ArrayList`, is it immutable?
+- **No.** `final` only makes the **reference** immutable (you can't point it to a different list). You can still add/remove elements. You must use defensive copying to ensure true immutability.
+
+---
+
+## 🏗️ Builder Design Pattern
+
+**Intent:** Simplify the creation of complex immutable objects by separating construction from representation.
+**Use cases:** Classes with many parameters (some optional), configuration objects, constructing immutable aggregates.
+
+---
+
+## 🛑 The Problem: Telescoping Constructors
+What happens if a class has many fields (e.g., 8–10)? We either need one huge constructor, or many overloaded constructors (known as "Telescoping Constructors").
+
+```java
+public class Order {
+    private final String customerId;
+    private final int priority;
+    private final boolean giftWrap;
+    private final boolean expressDelivery;
+
+    // Telescoping constructor
+    public Order(String customerId, int priority, boolean giftWrap, boolean expressDelivery) {
+        this.customerId = customerId;
+        this.priority = priority;
+        this.giftWrap = giftWrap;
+        this.expressDelivery = expressDelivery;
     }
 }
 ```
-- **The Solution**: 
-    - **Self-Contained**: The logic is all in one file.
-    - **Static Access**: We can create the `Builder` without needing a `MasterClass` object first.
-    - **Method Chaining**: The client code becomes much more readable and concise.
-    - **Atomicity**: The client doesn't need to manage the helper object reference (`helper`) explicitly.
+**Problem:** Hard to read, hard to maintain, confusing for callers (imagine seeing `new Order("C101", 1, true, false)` and trying to remember what those booleans mean without looking at the constructor).
+
+---
+
+## 💡 The Idea of Builder
+How can we make object creation clearer? We use a separate `Builder` that sets fields step by step conceptually, and then calls `build()`.
+
+```java
+public class Order {
+    private final String customerId;
+    private final int priority;
+    private final boolean giftWrap;
+    private final boolean expressDelivery;
+
+    // Private constructor taking the Builder
+    private Order(Builder b) {
+        this.customerId = b.customerId;
+        this.priority = b.priority;
+        this.giftWrap = b.giftWrap;
+        this.expressDelivery = b.expressDelivery;
+    }
+
+    // Static Inner Class Builder
+    public static class Builder {
+        private String customerId;
+        private int priority = 1; // default
+        private boolean giftWrap = false;
+        private boolean expressDelivery = false;
+
+        // Fluent Setters
+        public Builder customerId(String id) { this.customerId = id; return this; }
+        public Builder priority(int p) { this.priority = p; return this; }
+        public Builder giftWrap(boolean g) { this.giftWrap = g; return this; }
+        public Builder expressDelivery(boolean e) { this.expressDelivery = e; return this; }
+
+        public Order build() {
+            if (customerId == null) throw new IllegalStateException("customerId required");
+            return new Order(this);
+        }
+    }
+}
+```
+
+### 💻 Usage:
+```java
+Order order = new Order.Builder()
+    .customerId("C101")
+    .priority(2)
+    .giftWrap(true)
+    .build();
+```
+*Notice how readable the client code is now!*
+
+---
+
+## 🔒 Enforcing Required Fields
+How do we ensure mandatory fields are set so that we do not build an invalid state?
+- **Option 1**: Validate in the `build()` method (as seen above).
+- **Option 2**: Require them in the Builder's constructor!
+
+```java
+public static class Builder {
+    private final String customerId; // Required!
+    private int priority = 1;        // Optional
+    private boolean giftWrap = false;// Optional
+
+    public Builder(String customerId) {
+        this.customerId = Objects.requireNonNull(customerId);
+    }
+    // ... setters and build() ...
+}
+```
+
+---
+
+## 🎮 Complex Example: GameConfig
+What if we have a collection of rules and want to add them step by step? The Builder can accumulate them and build a highly secure immutable object.
+
+```java
+import java.util.*;
+
+public final class GameConfig {
+    private final String name;
+    private final List<String> rules;
+
+    private GameConfig(Builder b) {
+        this.name = b.name;
+        // Defensive copy to ensure immutability
+        this.rules = List.copyOf(b.rules); 
+    }
+
+    public static class Builder {
+        private String name;
+        private List<String> rules = new ArrayList<>();
+
+        public Builder name(String n) { this.name = n; return this; }
+        public Builder addRule(String r) { this.rules.add(r); return this; }
+        public Builder addAllRules(List<String> rs) { this.rules.addAll(rs); return this; }
+
+        public GameConfig build() {
+            if (name == null) throw new IllegalStateException("Name required");
+            return new GameConfig(this);
+        }
+    }
+}
+```
+
+### 💻 Usage:
+```java
+GameConfig config = new GameConfig.Builder()
+    .name("Battle Royale")
+    .addRule("No cheating")
+    .addRule("Time limit: 10 min")
+    .build();
+```
+
+---
+
+## 🛠️ Practical Considerations & Quick Recap
+
+- **Telescoping constructors are unreadable.**
+- **Builder separates construction from representation.**
+- **Builders work best for immutable classes.**
+- **Defaults** can be beautifully set right inside the Builder class.
+- **Fluent setters** (`return this;`) vastly improve readability.
+- **Enforce required fields** via the Builder's constructor or throwing exceptions in `build()`.
+- **Use defensive copies** for collections inside the core object constructor to preserve immutability.
+- Libraries like **Lombok** can auto-generate builders (`@Builder`), but they may hide complex or custom validation.
+
+---
+
+## 🎙️ Frequently Asked Interview Questions (Viva)
+
+#### Q1: What problem does the Builder pattern solve?
+**Answer**: It solves the "Telescoping Constructor" anti-pattern where a class has too many constructor parameters, many of which might be optional. It provides a readable, fluent, step-by-step approach to constructing complex objects without confusing callers.
+
+#### Q2: How can required fields be enforced in a Builder?
+**Answer**: There are two primary ways:
+1. Pass the highly mandatory fields directly into the `Builder`'s constructor. 
+2. Adding checks/validations inside the final `.build()` method and throwing an `IllegalStateException` or `IllegalArgumentException` if criteria aren't met.
+
+#### Q3: Why is Builder often used with immutable objects?
+**Answer**: Because immutable classes require all their state to be assigned exactly once at creation (via a constructor). If an object has many fields, an immutable constructor becomes massive. The Builder gathers all the data cleanly over multiple steps, and then passes it atomically into that massive `private` constructor via the `build()` method, giving us the best of both worlds (readability + strict immutability).
+
+#### Q4: Compare Builder with telescoping constructors in readability.
+**Answer**: A telescoping constructor forces the caller to write code like `new Order("C1", 2, true, false, true)`, forcing developers to memorize the parameter index/types. A Builder uses method chaining (Fluent API), resulting in `new Order.Builder("C1").priority(2).giftWrap(true).build()`, effectively self-documenting the code.
+
+---
 
 ---
 

@@ -239,7 +239,7 @@ public class Main {
         System.out.println("Tax: " + emp1.calculateIncomeTax());
     }
 }
-
+```
 ### Architecture Diagram
 ```text
                 +----------------------+

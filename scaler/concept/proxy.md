@@ -1,168 +1,146 @@
-# Proxy Design Pattern - Complete Notes with Java Code
+# 🛡️ Proxy Design Pattern
 
-## 1. Overview
-The **Proxy Design Pattern** is a **structural design pattern** that creates a **proxy object** (reference) to act as an intermediary for a real object. This allows you to:
-- Control access to the real object
-- Add extra functionality (validation, caching, logging)
-- Delay creation of expensive objects until needed   
+**Intent:** Provide a surrogate or placeholder for another object to control access to it.
+**Summary:** The Proxy acts as a "Middleman". It implements the exact same interface as the real object, allowing clients to interact with it seamlessly, while the Proxy handles "extra" work underneath (like lazy loading, security, caching, or network connections).
 
-**Key Idea**: Use proxy instead of direct access to reduce load on the actual object.  
+---
 
-## 2. Real-World Examples
+## 🛑 Problem: The Heavy Initialization Problem
+Imagine an application that processes large text files using a `BookParser`. The constructor of `BookParser` is incredibly heavy (e.g., establishing DB connections, loading a massive string into memory).
 
-### Payment System
-```
-Cash (Real Object)
-├── Credit Card (Proxy)
-├── Debit Card (Proxy) 
-├── UPI (Proxy)
-└── Online Transaction (Proxy)
-```
-All payment methods are **proxies for cash** - you don't carry cash, shopkeeper doesn't handle cash. **Win-win situation**.   
-
-### Bank Account & ATM
-```
-Bank Account (Real Object)
-└── ATM (Proxy)
-    ├── PIN Validation
-    ├── Balance Check
-    └── Withdraw Money
-```
-ATM provides **convenient access** to bank account without visiting the bank.   
-
-## 3. Core Components
-1. **Subject Interface** - Common interface for RealSubject and Proxy
-2. **RealSubject** - Actual object with business logic
-3. **Proxy** - Implements same interface, holds reference to RealSubject
-4. **Client** - Uses Proxy instead of RealSubject   
-
-## 4. Complete Java Implementation
-
-### Step 1: Account Interface (Subject)
 ```java
-public interface Account {
-    void withdraw(double amount);
-    String getAccountNumber();
+interface ITextParser { int getWordCount(); }
+
+class BookParser implements ITextParser {
+    public BookParser() {
+        System.out.println(">>> [HEAVY] Loading 2GB book into memory...");
+        // 2 Seconds delay
+    }
+    public int getWordCount() { return 50000; }
 }
-```
-**Purpose**: Forces both RealSubject and Proxy to implement same methods.  
 
-### Step 3: ATM (Proxy)
-```java
-public class ATM implements Account {
-    private BankAccount bankAccount;
-    private String pin;
+class TextProcessor {
+    private ITextParser parser;
+    public TextProcessor(ITextParser parser) { this.parser = parser; }
     
-    public ATM(String accountNumber, String pin) {
-        this.pin = pin;
-        // Lazy initialization - create real object only when needed
-        this.bankAccount = new BankAccount(accountNumber);
-    }
-    
-    @Override
-    public void withdraw(double amount) {
-        // **Proxy adds extra functionality** before calling real object
-        if (validatePin()) {
-            System.out.println("PIN validated successfully");
-            bankAccount.withdraw(amount);  // Delegate to real object
-        } else {
-            System.out.println("Invalid PIN! Transaction denied.");
+    public void executeLogic(boolean userClickedCount) {
+        System.out.println("UI Loaded.");
+        if (userClickedCount) {
+            System.out.println("Count is: " + parser.getWordCount());
         }
-    }
-    
-    @Override
-    public String getAccountNumber() {
-        if (validatePin()) {
-            return bankAccount.getAccountNumber();
-        }
-        return "Access denied - Invalid PIN";
-    }
-    
-    private boolean validatePin() {
-        // Simulate PIN validation
-        return "1234".equals(pin);
     }
 }
 ```
-**Key Proxy Features**:
-- **Validation** (PIN check)  
-- **Access Control**
-- **Lazy Loading** (bankAccount created only when needed)
-- **Delegates** to real object after validation  
 
-### Step 4: Client Code
+### 🚩 The Wasteful Execution
+If the client injects `new BookParser()` into the `TextProcessor`, the 2GB book is loaded immediately during initialization. **But what if `userClickedCount` is false?** We just wasted 2GB of RAM and 2 seconds of loading time for a feature the user didn't even use!
+
+---
+
+## 🛠️ Solution: The Virtual Proxy (Lazy Initialization)
+We create a `BookParserProxy` that implements the same interface but **delays** creating the real object until its methods are actually invoked.
+
 ```java
-public class Client {
+class BookParserProxy implements ITextParser {
+    private BookParser realParser; // Kept null initially
+
+    @Override
+    public int getWordCount() {
+        // LAZY LOADING: Create the heavy object only on the very first call
+        if (realParser == null) {
+            realParser = new BookParser();
+        }
+        return realParser.getWordCount();
+    }
+}
+```
+
+### 💻 The Refactored Client
+```java
+public class Main {
     public static void main(String[] args) {
-        // Client uses PROXY, not real object directly
-        Account atm = new ATM("1234567890", "1234");
+        // [INSTANT] Zero delay, 0 RAM used. The proxy is incredibly lightweight.
+        ITextParser proxy = new BookParserProxy(); 
+        TextProcessor ui = new TextProcessor(proxy);
+
+        ui.executeLogic(false); // Book is NEVER loaded! Massive optimalization.
         
-        atm.withdraw(1000);     // PIN validated → Real withdrawal
-        atm.withdraw(500);      // PIN validated → Real withdrawal
-        
-        System.out.println("Account: " + atm.getAccountNumber());
-        
-        // Wrong PIN
-        Account wrongAtm = new ATM("1234567890", "9999");
-        wrongAtm.withdraw(100); // Denied!
+        // If user DOES click:
+        ui.executeLogic(true); // >> [HEAVY] Loading 2GB book... -> Count is 50000.
     }
 }
 ```
 
-**Output**:
+---
+
+## 🖼️ Everyday Example: Image Placeholder (Virtual Proxy)
+When a webpage loads a heavy image, it often shows a grey box or a low-res preview while the real image downloads in the background.
+
+```java
+interface Graphic { void draw(); }
+
+class HighResImage implements Graphic {
+    public HighResImage(String url) { System.out.println("Downloading massive image from " + url); }
+    public void draw() { System.out.println("Drawing crystal clear image"); }
+}
+
+class ImageProxy implements Graphic {
+    private String url;
+    private HighResImage realImage;
+
+    public ImageProxy(String url) { this.url = url; }
+
+    @Override
+    public void draw() {
+        if (realImage == null) {
+            System.out.println("Drawing placeholder grey box...");
+            realImage = new HighResImage(url); // Starts download
+        }
+        realImage.draw();
+    }
+}
 ```
-PIN validated successfully
-Withdrawing $1000.0 from account 1234567890
-PIN validated successfully
-Withdrawing $500.0 from account 1234567890
-Account: 1234567890
-Invalid PIN! Transaction denied.
-```
 
-## 5. Benefits of Proxy Pattern
-| Benefit | Example |
-|---------|---------|
-| **Access Control** | PIN validation before withdrawal   |
-| **Lazy Loading** | BankAccount created only when validated |
-| **Remote Access** | ATM proxy for distant bank |
-| **Caching** | Store frequently accessed data |
-| **Logging** | Log all transactions |
-| **Optimization** | Reduce load on real object   |
+---
 
-## 6. When to Use Proxy Pattern
-✅ **Large/expensive objects** (database connections, network resources)  
-✅ **Need access control** (authentication, authorization)  
-✅ **Remote objects** (distributed systems)  
-✅ **Want to add functionality** (logging, caching, validation)  
+## 🌠 Types of Proxies
 
-❌ **Simple objects** (no added value)  
-❌ **Performance-critical** (extra layer adds overhead)
+1. **Virtual Proxy (Lazy Initialization)**: Delays creation of expensive objects (e.g., `BookParser`, `ImageProxy`).
+2. **Protection Proxy (Access Control)**: Checks if the user has permission before forwarding the request to the real object (e.g., A proxy that checks if a user is `Admin` before allowing a `delete()` call).
+3. **Remote Proxy**: The real object lives on a different server. The proxy handles the network communication (e.g., gRPC stubs, RMI).
+4. **Caching / Smart Proxy**: Stores the result of expensive operations so subsequent requests don't hit the real object.
 
-## 7. Class Diagram
-```mermaid
-classDiagram
-    class Account {
-        <<Interface>>
-        +withdraw(double amount)
-        +getAccountNumber() String
-    }
-    class BankAccount {
-        -String accountNumber
-        +withdraw(double amount)
-        +getAccountNumber() String
-    }
-    class ATM {
-        -BankAccount bankAccount
-        -String pin
-        +withdraw(double amount)
-        +getAccountNumber() String
-        -validatePin() boolean
-    }
-    class Client {
-    }
+---
 
-    Client --> Account
-    Account <|.. BankAccount
-    Account <|.. ATM
-    ATM o-- BankAccount : composition/delegation
-```
+## 👑 Relationship with SOLID Principles
+*   **Single Responsibility Principle (SRP)**: The real object focuses entirely on its core business logic (parsing a book). The proxy focuses entirely on lifecycle/access management.
+*   **Open/Closed Principle (OCP)**: We added lazy loading and caching without modifying the original `BookParser` class. We just mapped a proxy on top of it.
+
+---
+
+## ⚔️ Proxy vs Other Patterns
+
+| Pattern | Goal | Relationship |
+| :--- | :--- | :--- |
+| **Proxy** | Control access to an object. | Implements the SAME interface as the real object. |
+| **Decorator** | Add responsibilities/features dynamically. | Implements the SAME interface, but is designed to be chained/stacked. |
+| **Adapter** | Make incompatible classes work together. | Implements a DIFFERENT interface to act as a translator. |
+
+---
+
+## 🎙️ Frequently Asked Interview Questions (Viva)
+
+#### Q1: What is the defining characteristic of a Proxy?
+**Answer**: A Proxy holds a reference to a Real Object and implements the exact same interface as that Real Object. To the client, there is absolutely no difference between talking to the proxy and talking to the real object.
+
+#### Q2: How does a Proxy implement "Lazy Loading"?
+**Answer**: By deferring instantiation. The Proxy's constructor does not instantiate the heavy object; it simply stores the arguments needed. The heavy object is only instantiated with a `null` check inside the actual execution method (like `getWordCount()`) precisely when the client demands the data.
+
+#### Q3: Difference between Proxy and Decorator? (Classic Interview Question)
+**Answer**: A Proxy usually controls *access* (when and how the object is reached) and often manages the lifecycle (creation/destruction) of the real object internally. A Decorator *adds behavior* and is typically handed its real object by the client via its constructor, so decorators can be stacked indefinitely. Proxy focuses on "Protection/Delay", Decorator focuses on "Enhancement".
+
+#### Q4: Why is Proxy heavily used in ORMs (like Hibernate)?
+**Answer**: ORMs use Virtual Proxies to solve the "N+1 query problem" and infinite loops in relational mapping. If you load a `User`, Hibernate doesn't instantly query the database for all 50,000 of their `Posts`. Instead, it provides a Proxy list. The database is only actually queried when you call `.get(0)` or `.size()` on that Proxy list.
+
+---
+*Created for viva preparation using notes from Scaler LLD sessions.*

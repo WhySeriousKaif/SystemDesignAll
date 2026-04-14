@@ -2,201 +2,260 @@
 
 This session explores the **Factory Design Pattern** through the lens of a game design scenario: **"Dodge the Stones."**
 
----
+## 🏭 Factory Method Design Pattern
 
-## 🎮 The Story: Dodge the Stones
-
-In our game, a character moves forward and must dodge three types of stones: `SmallStone`, `MediumStone`, and `LargeStone`.
-
-```java
-// 1. The Interface
-interface Stone { void display(); }
-
-// 2. Concrete Products
-class SmallStone implements Stone { public void display() { System.out.println("🪨 Small Stone"); } }
-class MediumStone implements Stone { public void display() { System.out.println("⛰️ Medium Stone"); } }
-class LargeStone implements Stone { public void display() { System.out.println("🏔️ Large Stone"); } }
-
-// 3. The Problematic Client Code (Direct Instantiation)
-public class GameLoop {
-    private static int counter = 0;
-
-    public void run() {
-        while (gameIsRunning) {
-            Stone stone;
-            // PROBLEM: Hardcoded creation logic inside the core business loop
-            int choice = counter % 3;
-            if (choice == 0)      stone = new SmallStone();  // Tight Coupling
-            else if (choice == 1) stone = new MediumStone();
-            else                  stone = new LargeStone();
-
-            stone.display();
-            counter++;
-        }
-    }
-}
-```
-
-### 🚩 Why is this bad?
-1.  **Tight Coupling**: The `GameLoop` must know the exact names of all stone classes. If we rename a class, the core game logic breaks.
-2.  **Violation of Open/Closed Principle (OCP)**: Adding a new `GiantStone` requires modifyng the `if-else` block inside the `GameLoop`.
-3.  **Creation Logic Pollution**: The `GameLoop` should focus on physics/logic, not on *how* to construct objects or maintain a `counter` for sequencing.
-4.  **Poor Scalability**: If different levels need different generation logic (Random vs Uniform), the `GameLoop` becomes a mess of complex conditional branches.
+**Intent:** Define an interface for creating an object, but let subclasses decide which class to instantiate. Factory Method lets a class defer instantiation to subclasses.
 
 ---
 
-## 🛠️ Step 1: Simple Factory Solution
+## 🪨 Part A: The Simple Factory (A Pragmatic First Move)
 
-To decouple stone creation, we introduce a **Simple Factory**.
+### 1. The Problem
+Imagine you are building an action game where the player dodges `Stones` (`SmallStone`, `MediumStone`, `LargeStone`).
+*   Do we see `new SmallStone()`, `new MediumStone()` scattered across gameplay code?
+*   When a new size appears, must we edit many files to add `if/switch` logic?
+*   Would centralizing "which concrete class to instantiate" make our gameplay code easier to read?
+
+### 2. The Simple Factory Solution
+Move all "new" logic into one place: a utility cluster with a single static method. Client code depends only on the `Stone` abstraction.
 
 ```java
-public class StoneFactory {
-    public static Stone createStone(String type) {
-        switch (type.toLowerCase()) {
-            case "small": return new SmallStone();
-            case "medium": return new MediumStone();
-            case "large": return new LargeStone();
-            default: throw new IllegalArgumentException("Unknown stone type");
-        }
+// Stone domain
+enum StoneType { SMALL, MEDIUM, LARGE; }
+
+interface Stone {
+    String size();
+    int damage();
+}
+
+final class SmallStone implements Stone {
+    public String size() { return "SMALL"; }
+    public int damage() { return 5; }
+}
+
+final class MediumStone implements Stone {
+    public String size() { return "MEDIUM"; }
+    public int damage() { return 10; }
+}
+
+final class LargeStone implements Stone {
+    public String size() { return "LARGE"; }
+    public int damage() { return 18; }
+}
+
+// Simple Factory (utility)
+final class StoneFactory {
+    private StoneFactory() {} // Prevent instantiation
+
+    public static Stone create(StoneType t) {
+        return switch (t) {
+            case SMALL -> new SmallStone();
+            case MEDIUM -> new MediumStone();
+            case LARGE -> new LargeStone();
+        };
     }
 }
 
-// Client Usage
-Stone stone = StoneFactory.createStone("small");
+// Client Snippet
+class WaveLogicV0 {
+    Stone spawnOne(StoneType t) {
+        return StoneFactory.create(t); // Gameplay decoupled from concretes
+    }
+}
 ```
+
+**Pros**: Centralizes `new`, hides concretes, provides a single edit point for new sizes.
+**Cons**: The factory grows into a massive `switch` statement. It also provides NO support for differing creation *policies* (e.g., spawn randomly vs. spawn equal quotas).
 
 ---
 
-## 🚀 Step 2: Advanced Requirements (Factory Method)
+## 🚀 Part B: The Factory Method (When Creation Policy Varies)
 
-The game developers now want different **generation strategies**:
-1.  **Random Generation**: Stones appear unpredictably.
-2.  **Uniform Generation**: Stones appear in a fixed sequence (`Small → Medium → Large`).
+### 1. New Requirement
+*   Game Instance A: Spawn stones in a **Random** mix.
+*   Game Instance B: Spawn **Equal numbers** of each size step-by-step.
+*   *Can we keep the "generate wave" algorithm identical and swap ONLY the stone-selection policy?*
 
-This leads us to the **Factory Method Pattern**.
-
-### 1. The Interface
-Every generation strategy must implement this interface:
+### 2. Insight & Solution
+Put the fixed algorithm in a base creator (`StoneSpawner`). Inside that algorithm, call an overridable factory method (`createStone()`) that subclasses implement differently.
 
 ```java
-public interface StoneFactory {
-    Stone generateStone();
-}
-```
+import java.util.*;
+import java.util.concurrent.ThreadLocalRandom;
 
-### 2. Concrete Strategy: Random
-```java
-public class RandomStoneFactory implements StoneFactory {
-    public Stone generateStone() {
-        int random = (int) (Math.random() * 3);
-        switch (random) {
-            case 0: return new SmallStone();
-            case 1: return new MediumStone();
-            case 2: return new LargeStone();
-            default: throw new RuntimeException("Unexpected state");
+// Creator: owns the algorithm, defers instantiation to subclasses
+abstract class StoneSpawner {
+
+    // ---- Factory Method ----
+    protected abstract Stone createStone();
+
+    // Fixed algorithm that uses the factory method
+    public final List<Stone> generateWave(int count) {
+        List<Stone> wave = new ArrayList<>(count);
+        for (int i = 0; i < count; i++) {
+            Stone s = createStone(); // <-- polymorphic creation
+            wave.add(s);
         }
-    }
-}
-```
-
-### 3. Concrete Strategy: Uniform
-This strategy ensures stones appear in a repeating sequence (`Small → Medium → Large`).
-
-```java
-public class UniformStoneFactory implements StoneFactory {
-    private int counter = 0; // MUST be non-static for state isolation
-
-    public Stone generateStone() {
-        Stone stone;
-        // Mathematical Trick: Use Modulo (%) to cycle through 0, 1, 2
-        switch (counter % 3) {
-            case 0: stone = new SmallStone(); break;
-            case 1: stone = new MediumStone(); break;
-            case 2: stone = new LargeStone(); break;
-            default: throw new RuntimeException("Unexpected state");
-        }
-        
-        // Cycle the counter: 0 -> 1 -> 2 -> 0 ...
-        counter = (counter + 1) % 3;
-        return stone;
-    }
-}
-```
-
----
-
-## 🏗️ Step 3: The Stone Generator Factory (Strategy Selection)
-
-The core requirement is that the client chooses the **algorithm** once, and then the loop runs **without asking for arguments**.
-
-```java
-public class StoneGeneratorFactory {
-    public static StoneFactory getStoneFactory(String type) {
-        if ("random".equalsIgnoreCase(type)) {
-            return new RandomStoneFactory();
-        } else if ("uniform".equalsIgnoreCase(type)) {
-            return new UniformStoneFactory();
-        } else {
-            throw new IllegalArgumentException("Unknown factory type");
-        }
+        return wave;
     }
 }
 
-// --- CLIENT LOGIC ---
+// Concrete Creators (Different Creation Policies)
 
-// 1. SELECT Strategy ONCE (Decision Phase)
-StoneFactory factory = StoneGeneratorFactory.getStoneFactory("uniform");
+// Policy 1: Random distribution
+final class RandomStoneSpawner extends StoneSpawner {
+    @Override protected Stone createStone() {
+        int pick = ThreadLocalRandom.current().nextInt(3);
+        return switch (pick) {
+            case 0 -> new SmallStone();
+            case 1 -> new MediumStone();
+            default -> new LargeStone();
+        };
+    }
+}
 
-// 2. The Loop (Execution Phase)
-while (gameIsRunning) {
-    // ZERO-ARGUMENT CALL: The client doesn't specify 'what' to create anymore.
-    // The factory 'remember' the strategy and state internally.
-    Stone stone = factory.generateStone();
-    stone.display();
+// Policy 2: Equal round-robin distribution
+final class EqualizedStoneSpawner extends StoneSpawner {
+    private int idx = 0;
+    @Override protected Stone createStone() {
+        Stone s = switch (idx) {
+            case 0 -> new SmallStone();
+            case 1 -> new MediumStone();
+            default -> new LargeStone();
+        };
+        idx = (idx + 1) % 3;
+        return s;
+    }
+}
+
+// Client Demo
+class WaveLogicV1 {
+    public static void main(String[] args) {
+        StoneSpawner random = new RandomStoneSpawner();
+        StoneSpawner equal = new EqualizedStoneSpawner();
+
+        // The algorithm `generateWave` is reused flawlessly!
+        System.out.println("Random: " + random.generateWave(3));
+        System.out.println("Equalized: " + equal.generateWave(3));
+    }
 }
 ```
 
 ---
 
-## 🏗️ Architectural Segregation: Why this matters
+## ✈️ Complex Example: Fighter Jet Producers
+You are modeling a combat simulator that builds a fleet of jets based on Generation requests (Gen 4, Gen 5). Different manufacturers (HAL vs Lockheed Martin) fulfill the *same* request with *different* concrete models.
 
-The core benefit of the Factory pattern is the **Segregation of Creation from Execution**.
+```java
+enum Generation { GEN4, GEN4_PLUS, GEN5 }
 
-### 🗺️ The Design Map
+interface FighterJet {
+    String model();
+    Generation generation();
+    String manufacturer();
+}
+
+// Concrete Products
+final class TejasMk1 implements FighterJet { /* ... returns GEN4, HAL */ }
+final class F35A implements FighterJet { /* ... returns GEN5, Lockheed */ }
+// ... other models
+
+// --- Creator Interface (Factory Method) ---
+interface FighterJetFactory {
+    FighterJet createJet(Generation gen);
+}
+
+// --- Concrete Creators: Decide the mapping ---
+final class HALFactory implements FighterJetFactory {
+    @Override public FighterJet createJet(Generation gen) {
+        return switch (gen) {
+            case GEN4 -> new TejasMk1();
+            case GEN4_PLUS -> new TejasMk2();
+            case GEN5 -> throw new UnsupportedOperationException("Gen 5 not available");
+        };
+    }
+}
+
+final class LockheedMartinFactory implements FighterJetFactory {
+    @Override public FighterJet createJet(Generation gen) {
+        return switch (gen) {
+            case GEN4 -> new F15EX();
+            case GEN5 -> new F35A();
+            default -> new F15EX();
+        };
+    }
+}
+
+// --- Algorithm depending purely on the Factory Interface ---
+final class MissionPlanner {
+    List<FighterJet> planFleet(FighterJetFactory factory, List<Generation> demand) {
+        var result = new ArrayList<FighterJet>();
+        // The algorithm uses the factory method:
+        for (var g : demand) result.add(factory.createJet(g)); 
+        return result;
+    }
+}
+```
+
+---
+
+## 📊 UML Diagram
+
 ```mermaid
-graph LR
-    subgraph "Creation Logic (Helper)"
-    SG[StoneGeneratorFactory] --> RF[RandomStoneFactory]
-    SG --> UF[UniformStoneFactory]
-    end
-
-    subgraph "Execution Logic (Core)"
-    GL[Game Loop]
-    end
-
-    SG -.->|returns| IF[StoneFactory Interface]
-    GL -->|uses| IF
-    IF -->|generates| ST[Stone Object]
+classDiagram
+    class Stone {
+        <<interface>>
+        +size()
+        +damage()
+    }
+    class SmallStone
+    class MediumStone
+    class LargeStone
+    
+    Stone <|.. SmallStone
+    Stone <|.. MediumStone
+    Stone <|.. LargeStone
+    
+    class StoneSpawner {
+        <<abstract>>
+        #createStone()* Stone
+        +generateWave(count) List~Stone~
+    }
+    
+    class RandomStoneSpawner {
+        #createStone() Stone
+    }
+    
+    class EqualizedStoneSpawner {
+        #createStone() Stone
+    }
+    
+    StoneSpawner <|-- RandomStoneSpawner
+    StoneSpawner <|-- EqualizedStoneSpawner
+    
+    RandomStoneSpawner ..> Stone : "creates"
+    EqualizedStoneSpawner ..> Stone : "creates"
 ```
-
-### 🗝️ Key Nuances:
-1.  **Eager Selection, Lazy Generation**: The generation logic (The Factory) is selected **once** at the start. The actual objects (The Stones) are generated **one-by-one** on-demand.
-2.  **Stateless vs Stateful**: 
-    - `RandomStoneFactory` is stateless (each call is independent).
-    - `UniformStoneFactory` is **stateful** (it needs to remember the previous stone to pick the next in sequence).
-3.  **Encapsulation**: If a `Stone` constructor changes (e.g., adding `color` or `speed`), we only update the Factory. The thousands of lines of code in the Game Loop remain untouched.
 
 ---
 
-## 🎙️ Interview & Design Insights
+## 🎙️ Frequently Asked Interview Questions (Viva)
 
-### 🛡️ Why use this?
-1.  **Encapsulation**: Creation logic is hidden from the client.
-2.  **Extensibility**: Adding a `LevelBasedFactory` is easy and won't break the game loop.
-3.  **State Management**: By keeping the `counter` **non-static** in `UniformStoneFactory`, we ensure that two parallel games don't mess up each other's stone sequences.
+#### Q1: What is the main difference between a Simple Factory and the Factory Method Pattern?
+**Answer**: A **Simple Factory** is just a utility class with a static method grouping `new` statements (often with a massive `switch` case). It hides constructors, but its creation logic cannot be easily swapped or extended. 
+The **Factory Method Pattern** defines an abstract class or interface with a core algorithm, but *defers the object instantiation* (`createStone()`) to its subclasses, allowing policies to vary per creator instance seamlessly.
 
-### 🏢 Real-world Application
-This specific "Stone Generation" problem is a classic **Machine Coding** interview question (asked at companies like **Swiggy**).
+#### Q2: What forces us to move from a Simple Factory to the Factory Method Pattern?
+**Answer**: We move to Factory Method when the **creation policy** needs to vary dynamically per instance. For example, if we need to spawn stones based on a "Random Mix" vs "Strict Quota/Equalized", we can keep the spawning loop inside the base class but override the actual selection policy via subclasses.
+
+#### Q3: Why does Factory Method inherently support the Open/Closed Principle?
+**Answer**: If a new creation policy is introduced (e.g., `WeightedStoneSpawner` or a new subset manufacturer like `SukhoiFactory`), we do not need to edit existing `generateWave` or `planFleet` algorithms. We simply write a new subclass extending the factory base and swap it at composition time.
+
+#### Q4: Name a few real-world examples besides games where Factory Method shines.
+**Answer**: 
+1. **Exporters**: Base class fixes validation/streaming, while `createWriter()` is overridden to provide `CsvWriter`, `XlsxWriter`, or `JsonWriter`.
+2. **Dialogs**: Base `render()` builds the UI algorithm, while `createButton()` is overridden to return Windows vs MacOS styled buttons.
+3. **Maze Games**: `createMaze()` fixes the architecture, but `makeRoom()` or `makeDoor()` is deferred to `EnchantedMazeGame` vs `BombedMazeGame`.
 
 ---
 

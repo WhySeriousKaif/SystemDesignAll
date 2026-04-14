@@ -550,3 +550,18 @@ public class NotificationClient {
 *   **Total OCP Compliance**: If a client demands a new `PushNotificationSender` tomorrow, we just create a new `PushDecorator`. We **never** touch the `EmailSender`, `WhatsAppDecorator`, or `SMSDecorator` classes.
 *   **Destroys Inheritance Explosions**: Instead of creating 7+ tightly-coupled subclasses like `EmailAndSMSExporter`, we created exactly 3 modular Decorator components that can be mixed and matched into infinite permutations at runtime.
 *   **Dynamic Flexibility**: We can add (`new WhatsAppDecorator(sender)`) or remove decorators dynamically based purely on the shifting state of the live application.
+
+---
+
+### 🎙️ Frequently Asked Interview Questions (Viva)
+
+#### Q1: What is the primary difference between Decorator and Inheritance?
+**Answer**: Inheritance is static and applies to an entire class at compile-time, leading to an explosion of subclasses when combining features. Decorator is dynamic and applies to individual objects at runtime via composition, allowing infinite chaining without creating new base classes.
+
+#### Q2: What are the two structural rules every Decorator must follow?
+**Answer**: 
+1. It must **Implement** the exact same interface as the object it is decorating (so the client can use it interchangeably).
+2. It must **Compose (Wrap)** an instance of that exact same interface (so it can delegate the core work before/after doing its own extra work).
+
+#### Q3: Can a Client tell the difference between the base object and the decorated object?
+**Answer**: No! That is the magic of the pattern. Because the Decorator implements the base interface (`INotificationSender`), the Client variable holds it the exact same way. The Client calls `.send()` completely ignorant of how many wrappers are inside it.

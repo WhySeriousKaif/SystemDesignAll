@@ -4,6 +4,12 @@ This guide summarizes the **5 key design principles** discussed in the Scaler LL
 
 ---
 
+## 🤔 Why SOLID?
+- **Aim of LLD**: To write code that is **easier to understand**, **easier to extend**, and **easier to maintain**.
+- **SOLID** is a set of 5 design principles that, when followed, organically give us these desired structural qualities.
+
+---
+
 ## 🏗️ 1. Single Responsibility Principle (SRP)
 > **"A class should have only one reason to change."**
 
@@ -29,6 +35,26 @@ class EmployeeRepository {
     }
 }
 ```
+
+### 🚨 Quick Checks for SRP Violations
+1. **Multiple `if/else` statements**: Usually indicates a method handling multiple behaviors.
+2. **"God" or Monster Methods**: Methods doing too many things.
+    ```java
+    int getIncome() {
+        // 1. Generate payslip
+        // 2. Convert PS to JSON
+        // 3. Mail PS to the employee
+        return this.income;
+    }
+    ```
+3. **Unspecified `Util` or `Helper` classes**: Classes that become dump-grounds for unrelated methods.
+    ```java
+    class Util {
+        void rupeeToDollar(int amount) {}
+        int calculateIncomeTax(Employee e) {}
+        String toString(Object obj) {}
+    }
+    ```
 
 ---
 
@@ -56,6 +82,27 @@ class FountainPen extends Pen {
     @Override public void write(String text) { /* Fountain logic */ }
 }
 ```
+
+### 💼 Tax Calculation Example (HR System)
+- **Requirement**: Calculate income tax for Full-Time Employees (FTEs) differently than for Interns.
+- **Violation (Bad approach)**: Having an `if (e instanceof Intern)` ... `else if (e instanceof FTE)` inside a calculate method violates OCP and SRP.
+- **Fix**: Create an abstract `TaxCalculationUtil` and let concrete subclasses implement specific rules.
+
+```java
+// ✅ OCP: Open for extension
+abstract class TaxCalculationUtil {
+    public abstract double calculate(Employee e);
+}
+
+class FTETaxCalculationUtil extends TaxCalculationUtil {
+    @Override public double calculate(Employee e) { return (e.income * 0.30) + (e.income * 0.02); }
+}
+
+class InternTaxCalculationUtil extends TaxCalculationUtil {
+    @Override public double calculate(Employee e) { return e.income * 0.15; }
+}
+```
+*Pros: Adding a new employee type means just adding a new TaxCalculation class without touching existing ones.*
 
 ---
 
@@ -109,6 +156,11 @@ class Robot implements Workable {
 }
 ```
 
+### 🧑‍💼 The HR System Example: Unpaid Interns
+- **Problem**: If we have an `Employee` interface with `getSalary()` and `processPayment()`, what happens when we introduce an `UnpaidIntern`?
+- **Violation**: The `UnpaidIntern` is forced to implement `processPayment()`, even though they aren't paid.
+- **Fix**: Break down the "fat" `Employee` interface. Keep it thin, moving payment logic to a separate `Payable` interface that only paid employees implement.
+
 ---
 
 ## 🔌 5. Dependency Inversion Principle (DIP)
@@ -133,6 +185,32 @@ class SellerRankingService {
     }
 }
 ```
+
+### 🛒 The E-Commerce Example: PaymentProcessor
+- **Problem**: A `PaymentProcessor` class directly instantiating a `SqlProductRepo` (a low-level class). If we switch to MongoDB, `PaymentProcessor` breaks.
+- **Fix**: Instead of creating concrete objects inside other classes, inject an abstraction through the constructor (`ProductRepo`).
+
+```java
+// ✅ Abstraction
+interface ProductRepo {
+    Product getProductById(String productId);
+}
+
+// ✅ High-level module depends on abstraction
+class PaymentProcessor {
+    private ProductRepo repo;
+    
+    public PaymentProcessor(ProductRepo repo) {
+        this.repo = repo; // Constructor Injection
+    }
+    
+    void pay(String productId) {
+        Product p = repo.getProductById(productId);
+        // Process payment
+    }
+}
+```
+*Now, to use MongoDB, just pass `new MongoProductRepo()` into the PaymentProcessor constructor!*
 
 ---
 
@@ -211,6 +289,31 @@ class EmployeeRepository {
 | **LSP** | **Substitution** | Reliable inheritance, safe polymorphism. |
 | **ISP** | **Specific** | Clean contracts, no "dumb" method implementations. |
 | **DIP** | **Abstraction** | Plug-and-play architecture, easy testing. |
+
+---
+
+## 🎙️ Frequently Asked Interview Questions (Viva)
+
+#### Q1: Why do we need the SOLID principles?
+**Answer**: SOLID principles are essential for writing low-level code that is easy to understand, extend, and maintain. They help prevent rigid architecture, reduce the chance of code breaking during updates, and allow developer teams to work independently on different features.
+
+#### Q2: What are some quick "smells" or checks that indicate a Single Responsibility Principle (SRP) violation?
+**Answer**: 
+- **Multiple `if/else` ladders**: Often point to a single method handling multiple behaviors.
+- **God/Monster Methods**: A method doing multiple distinct tasks (e.g., parsing, saving, and emailing).
+- **Unspecified Util/Helper Classes**: Classes like `StringUtil` that become massive dumping grounds for completely unrelated functions.
+
+#### Q3: How does the Open/Closed Principle (OCP) prevent breaking existing features?
+**Answer**: OCP dictates that classes should be closed to modification but open for extension. By using abstract classes or interfaces, we can add new capabilities (like a new tax rule or a new type of Pen) by creating new derived classes, completely avoiding the need to edit (and potentially break) existing, tested code.
+
+#### Q4: Why shouldn't a Penguin class simply implement a fly() method by throwing an Exception or doing nothing?
+**Answer**: This violates the **Liskov Substitution Principle (LSP)**. If the rest of the code expects a base type (`Bird`) to be able to successfully `fly()`, swapping that base type with the given derived type (`Penguin`) will alter the correctness of the program and cause crashes.
+
+#### Q5: What is a "Fat Interface," and how does it relate to ISP?
+**Answer**: A "fat interface" is a broad interface with many responsibilities. The **Interface Segregation Principle (ISP)** states that clients shouldn't be forced to depend on methods they don't use. For example, forcing an `UnpaidIntern` class to implement a `processPayment()` method from a fat Employee interface. The solution is splitting it into thinner, specific interfaces like `Payable`.
+
+#### Q6: Dependency Inversion Principle says "depend upon abstractions, not concretions." How is this practically achieved in code?
+**Answer**: It is achieved by avoiding the instantiation of concrete classes inside other classes (`new SqlProductRepo()`). Instead, the higher-level class expects an interface (`ProductRepo`), and the concrete object is provided via **Dependency Injection** (typically passed through the class's constructor).
 
 ---
 *Created for viva preparation using notes from Scaler LLD sessions.*
